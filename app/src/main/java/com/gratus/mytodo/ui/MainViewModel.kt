@@ -1,0 +1,521 @@
+package com.gratus.mytodo.ui
+
+import android.app.AlarmManager
+import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.gratus.mytodo.components.NotificationReceiver
+import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.TaskDatabase
+import com.gratus.mytodo.data.TaskRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * Navigation screen selection.
+ */
+enum class Screen {
+    HOME,
+    HISTORY,
+    STATS,
+    SETTINGS
+}
+
+/**
+ * Task sorting modes.
+ */
+enum class SortOption {
+    PRIORITY,
+    ADDED_SEQUENCE
+}
+
+/**
+ * Historical screen display modes.
+ */
+enum class DisplayType {
+    LIST,
+    GROUPED
+}
+
+/**
+ * Historical filter modes.
+ */
+enum class FilterOption {
+    ALL,
+    MARKED_COMPLETE,
+    LEFT_INCOMPLETE
+}
+
+/**
+ * Core ViewModel designed in MVVM pattern, strictly separating logic from Compose UI.
+ */
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository: TaskRepository
+    private val sharedPrefs = application.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+
+    // Current screen navigation state
+    private val _activeScreen = MutableStateFlow(Screen.HOME)
+    val activeScreen: StateFlow<Screen> = _activeScreen.asStateFlow()
+
+    // Current focus date for main screen
+    private val _currentDate = MutableStateFlow(Calendar.getInstance())
+    val currentDate: StateFlow<Calendar> = _currentDate.asStateFlow()
+
+    // Tasks list for the active date on home screen
+    private val _sortingOption = MutableStateFlow(
+        SortOption.valueOf(sharedPrefs.getString("sort_option", SortOption.ADDED_SEQUENCE.name) ?: SortOption.ADDED_SEQUENCE.name)
+    )
+    val sortingOption: StateFlow<SortOption> = _sortingOption.asStateFlow()
+
+    // Settings States
+    private val _settingsTheme = MutableStateFlow(sharedPrefs.getString("theme", "auto") ?: "auto")
+    val settingsTheme: StateFlow<String> = _settingsTheme.asStateFlow()
+
+    private val _settingsColorScheme = MutableStateFlow(sharedPrefs.getString("color_scheme", "minimal") ?: "minimal")
+    val settingsColorScheme: StateFlow<String> = _settingsColorScheme.asStateFlow()
+
+    private val _lastUsedPriority = MutableStateFlow(sharedPrefs.getInt("last_priority", 1))
+    val lastUsedPriority: StateFlow<Int> = _lastUsedPriority.asStateFlow()
+
+    // Historical screen states
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _historyZoomLevel = MutableStateFlow(3) // 1 (tight/compact) to 5 (expanded/zoomed in)
+    val historyZoomLevel: StateFlow<Int> = _historyZoomLevel.asStateFlow()
+
+    private val _historyDisplayType = MutableStateFlow(DisplayType.LIST)
+    val historyDisplayType: StateFlow<DisplayType> = _historyDisplayType.asStateFlow()
+
+    private val _historyFilter = MutableStateFlow(FilterOption.ALL)
+    val historyFilter: StateFlow<FilterOption> = _historyFilter.asStateFlow()
+
+    // Database Flows
+    private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    init {
+        val database = TaskDatabase.getDatabase(application)
+        repository = TaskRepository(database.taskDao())
+        
+        // Fetch last used priority on launch
+        viewModelScope.launch {
+            _lastUsedPriority.value = repository.getLastUsedPriority()
+        }
+    }
+
+    /**
+     * Set active drawer screen.
+     */
+    fun setActiveScreen(screen: Screen) {
+        _activeScreen.value = screen
+    }
+
+    /**
+     * Swiping / navigating dates on Home Screen.
+     */
+    fun navigateDate(days: Int) {
+        val newCal = Calendar.getInstance().apply {
+            time = _currentDate.value.time
+            add(Calendar.DAY_OF_YEAR, days)
+        }
+        _currentDate.value = newCal
+    }
+
+    fun setDate(calendar: Calendar) {
+        _currentDate.value = calendar
+    }
+
+    /**
+     * Get reactive task lists for current date on Home Screen.
+     */
+    val homeTasks: Flow<List<Task>> = _currentDate
+        .map { cal -> dateFormatter.format(cal.time) }
+        .flatMapLatest { dateStr -> repository.getTasksForDate(dateStr) }
+        .combine(_sortingOption) { taskList, sort ->
+            when (sort) {
+                SortOption.PRIORITY -> taskList.sortedBy { it.priority }
+                SortOption.ADDED_SEQUENCE -> taskList.sortedBy { it.createdSeq }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Reactive task lists for history screen (filters applied via queries or combination).
+     */
+    val historyTasks: Flow<List<Task>> = combine(
+        _searchQuery,
+        _historyFilter
+    ) { query, filter ->
+        Pair(query, filter)
+    }.flatMapLatest { (query, filter) ->
+        val baseFlow = if (query.isBlank()) {
+            repository.getAllTasks()
+        } else {
+            repository.searchTasks(query)
+        }
+        
+        baseFlow.map { list ->
+            val todayStr = dateFormatter.format(System.currentTimeMillis())
+            list.filter { task ->
+                when (filter) {
+                    FilterOption.ALL -> true
+                    FilterOption.MARKED_COMPLETE -> task.isCompleted
+                    FilterOption.LEFT_INCOMPLETE -> {
+                        // Left incomplete: in the past and isCompleted is false
+                        !task.isCompleted && task.dateAdded < todayStr
+                    }
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Change main sorting.
+     */
+    fun toggleSorting() {
+        val next = if (_sortingOption.value == SortOption.PRIORITY) {
+            SortOption.ADDED_SEQUENCE
+        } else {
+            SortOption.PRIORITY
+        }
+        _sortingOption.value = next
+        sharedPrefs.edit().putString("sort_option", next.name).apply()
+    }
+
+    /**
+     * Task insertions from Dialog.
+     */
+    fun addTask(
+        title: String,
+        description: String,
+        priority: Int,
+        targetDate: Calendar,
+        replicateDates: List<String>, // yyyy-MM-dd format future copies
+        everydayDaysCount: Int = 0, // if everyday is checked, range of next everyday copies
+        reminderTimeMillis: Long? = null
+    ) {
+        viewModelScope.launch {
+            val dateStr = dateFormatter.format(targetDate.time)
+            val baseTask = Task(
+                title = title,
+                description = description,
+                priority = priority,
+                dateAdded = dateStr,
+                reminderTime = reminderTimeMillis,
+                isRecurring = everydayDaysCount > 0,
+                createdSeq = System.currentTimeMillis()
+            )
+
+            // Save last used priority
+            _lastUsedPriority.value = priority
+            sharedPrefs.edit().putInt("last_priority", priority).apply()
+
+            val baseId = repository.insertTask(baseTask).toInt()
+            
+            // Set alarm if custom reminder was scheduled
+            if (reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
+                val scheduledTask = baseTask.copy(id = baseId)
+                scheduleExactReminder(scheduledTask)
+            }
+
+            // Replicate to custom selected future dates
+            replicateDates.forEach { futureDate ->
+                if (futureDate != dateStr) {
+                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null)
+                    repository.insertTask(futureTask)
+                }
+            }
+
+            // Replicate automatically to "everyday" range
+            if (everydayDaysCount > 0) {
+                for (i in 1..everydayDaysCount) {
+                    val runCal = Calendar.getInstance().apply {
+                        time = targetDate.time
+                        add(Calendar.DAY_OF_YEAR, i)
+                    }
+                    val dailyStr = dateFormatter.format(runCal.time)
+                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null)
+                    repository.insertTask(everydayTask)
+                }
+            }
+        }
+    }
+
+    /**
+     * Complete task.
+     */
+    fun toggleCompleted(task: Task) {
+        viewModelScope.launch {
+            val updated = task.copy(isCompleted = !task.isCompleted)
+            repository.updateTask(updated)
+            
+            // Cancel alarm if marked completed
+            if (updated.isCompleted) {
+                cancelReminder(updated)
+            } else if (updated.reminderTime != null && updated.reminderTime > System.currentTimeMillis()) {
+                scheduleExactReminder(updated)
+            }
+        }
+    }
+
+    /**
+     * Delete task completely from the logs.
+     */
+    fun deleteTask(task: Task) {
+        viewModelScope.launch {
+            repository.deleteTask(task)
+            cancelReminder(task)
+        }
+    }
+
+    /**
+     * Alarm Notification Scheduler.
+     */
+    private fun scheduleExactReminder(task: Task) {
+        val time = task.reminderTime ?: return
+        val application = getApplication<Application>()
+        val alarmManager = application.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(application, NotificationReceiver::class.java).apply {
+            putExtra("task_id", task.id)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            application,
+            task.id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+            }
+        } catch (e: SecurityException) {
+            Log.e("MainViewModel", "Permission denied for exact alarms: ${e.message}")
+        }
+    }
+
+    private fun cancelReminder(task: Task) {
+        val application = getApplication<Application>()
+        val alarmManager = application.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        val intent = Intent(application, NotificationReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            application,
+            task.id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
+    }
+
+    /**
+     * Settings configurations.
+     */
+    fun setTheme(theme: String) {
+        _settingsTheme.value = theme
+        sharedPrefs.edit().putString("theme", theme).apply()
+    }
+
+    fun setColorScheme(scheme: String) {
+        _settingsColorScheme.value = scheme
+        sharedPrefs.edit().putString("color_scheme", scheme).apply()
+    }
+
+    /**
+     * History Screen configuration controls.
+     */
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun zoomHistory(direction: Int) {
+        val target = _historyZoomLevel.value + direction
+        _historyZoomLevel.value = target.coerceIn(1, 5)
+    }
+    
+    fun setHistoryZoom(level: Int) {
+        _historyZoomLevel.value = level.coerceIn(1, 5)
+    }
+
+    fun setHistoryDisplay(type: DisplayType) {
+        _historyDisplayType.value = type
+    }
+
+    fun setHistoryFilter(filter: FilterOption) {
+        _historyFilter.value = filter
+    }
+
+    /**
+     * Real-time completion statistics.
+     */
+    val statsFlow: Flow<StatsData> = repository.getAllTasks()
+        .map { allTasks ->
+            val total = allTasks.size
+            val completed = allTasks.count { it.isCompleted }
+            val completionRate = if (total > 0) (completed.toFloat() / total * 100).toInt() else 0
+
+            // Consistency calculation (Consecutive days with at least one completed task)
+            val tasksGroupedByDate = allTasks.groupBy { it.dateAdded }
+            val completedDates = tasksGroupedByDate.filter { (_, tasks) ->
+                tasks.any { it.isCompleted }
+            }.keys.sortedDescending()
+
+            var streak = 0
+            if (completedDates.isNotEmpty()) {
+                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val today = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                
+                var checkCal = Calendar.getInstance().apply { time = today.time }
+                var indexDate = 0
+                
+                // If they completed yesterday or today, trace streak back
+                val todayStr = sdf.format(today.time)
+                val yesterdayCal = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -1)
+                }
+                val yesterdayStr = sdf.format(yesterdayCal.time)
+
+                if (completedDates.contains(todayStr) || completedDates.contains(yesterdayStr)) {
+                    // Set checkCal starting date to either today (if they completed today) or yesterday (if yesterday)
+                    if (!completedDates.contains(todayStr)) {
+                        checkCal.add(Calendar.DAY_OF_YEAR, -1)
+                    }
+
+                    while (true) {
+                        val currentCheckStr = sdf.format(checkCal.time)
+                        if (completedDates.contains(currentCheckStr)) {
+                            streak++
+                            checkCal.add(Calendar.DAY_OF_YEAR, -1)
+                        } else {
+                            break
+                        }
+                    }
+                }
+            }
+
+            // Task completion dataset over last 7 days for graphing
+            val last7DaysData = mutableListOf<DailyStats>()
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val labelSdf = SimpleDateFormat("MM-dd", Locale.getDefault())
+
+            for (i in 6 downTo 0) {
+                val cal = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -i)
+                }
+                val dateStr = sdf.format(cal.time)
+                val label = labelSdf.format(cal.time)
+                val dayTasks = tasksGroupedByDate[dateStr] ?: emptyList()
+                val dayTotal = dayTasks.size
+                val dayCompleted = dayTasks.count { it.isCompleted }
+                
+                last7DaysData.add(DailyStats(label, dayCompleted, dayTotal))
+            }
+
+            StatsData(total, completed, completionRate, streak, last7DaysData)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), StatsData(0, 0, 0, 0, emptyList()))
+
+    /**
+     * Backups JSON exporting.
+     */
+    fun exportBackup(): String {
+        return try {
+            val arr = JSONArray()
+            runBlocking(Dispatchers.IO) {
+                val allTasks = TaskDatabase.getDatabase(getApplication()).taskDao().getAllTasksDirect()
+                allTasks.forEach { task ->
+                    val obj = JSONObject().apply {
+                        put("id", task.id)
+                        put("title", task.title)
+                        put("description", task.description)
+                        put("priority", task.priority)
+                        put("dateAdded", task.dateAdded)
+                        put("isCompleted", task.isCompleted)
+                        put("reminderTime", task.reminderTime ?: JSONObject.NULL)
+                        put("isRecurring", task.isRecurring)
+                        put("createdSeq", task.createdSeq)
+                    }
+                    arr.put(obj)
+                }
+            }
+            arr.toString(2)
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Export failed: ${e.message}")
+            ""
+        }
+    }
+
+    /**
+     * Backups JSON importing.
+     */
+    fun importBackup(jsonStr: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val arr = JSONArray(jsonStr)
+                val tasks = ArrayList<Task>()
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    val reminderTime = if (obj.isNull("reminderTime")) null else obj.getLong("reminderTime")
+                    val task = Task(
+                        id = if (obj.has("id")) obj.getInt("id") else 0,
+                        title = obj.getString("title"),
+                        description = obj.getString("description"),
+                        priority = obj.getInt("priority"),
+                        dateAdded = obj.getString("dateAdded"),
+                        isCompleted = obj.getBoolean("isCompleted"),
+                        reminderTime = reminderTime,
+                        isRecurring = if (obj.has("isRecurring")) obj.getBoolean("isRecurring") else false,
+                        createdSeq = if (obj.has("createdSeq")) obj.getLong("createdSeq") else System.currentTimeMillis()
+                    )
+                    tasks.add(task)
+                }
+                
+                if (tasks.isNotEmpty()) {
+                    repository.insertTasks(tasks)
+                    onComplete(true)
+                } else {
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Import failed: ${e.message}")
+                onComplete(false)
+            }
+        }
+    }
+}
+
+/**
+ * Data structures for Stats.
+ */
+data class StatsData(
+    val totalTasks: Int,
+    val completedTasks: Int,
+    val completionRate: Int,
+    val currentStreak: Int,
+    val weeklyHistory: List<DailyStats>
+)
+
+data class DailyStats(
+    val dateLabel: String,
+    val completed: Int,
+    val total: Int
+)

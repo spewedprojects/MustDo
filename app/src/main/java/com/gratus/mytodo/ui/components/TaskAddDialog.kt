@@ -1,0 +1,551 @@
+package com.gratus.mytodo.ui.components
+
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.gratus.mytodo.ui.MainViewModel
+import com.gratus.mytodo.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * TaskAddDialog presents a rich Material 3 center dialog with complete task configurations.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TaskAddDialog(
+    initialDate: Calendar,
+    lastUsedPriority: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (
+        title: String,
+        description: String,
+        priority: Int,
+        targetDate: Calendar,
+        replicateDates: List<String>,
+        everydayCount: Int,
+        reminderTimeMillis: Long?
+    ) -> Unit
+) {
+    val context = LocalContext.current
+
+    var title by remember { mutableStateOf("") }
+    // Description text state holds TextFieldValue for selection range tracking & formatting injection.
+    var descriptionValue by remember { mutableStateOf(TextFieldValue("")) }
+    
+    // Priority state defaults to last used priority
+    var priority by remember { mutableStateOf(lastUsedPriority.coerceIn(1, 4)) }
+
+    // Alarm reminder state (timestamp milliseconds)
+    var reminderTimestamp by remember { mutableStateOf<Long?>(null) }
+
+    // Recurrence selection
+    var everydayCount by remember { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
+    val replicationDates = remember { mutableStateListOf<String>() }
+
+    // Calendar instances for rendering next 7 days clone option
+    val nextDays = remember {
+        val list = mutableListOf<Calendar>()
+        val start = Calendar.getInstance()
+        // we start from tomorrows date
+        for (i in 1..7) {
+            val d = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, i)
+            }
+            list.add(d)
+        }
+        list
+    }
+    val dayFormatter = SimpleDateFormat("EEE dd", Locale.getDefault())
+    val dbFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .padding(vertical = 16.dp)
+                .testTag("task_add_dialog_card"),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "New To-Do Task",
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close Dialog")
+                    }
+                }
+
+                // Title Input
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Task Title") },
+                    placeholder = { Text("What needs to be done?") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("task_title_input"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                // Description Input & Custom Formatting Toolbar
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = descriptionValue,
+                        onValueChange = { descriptionValue = it },
+                        label = { Text("Description") },
+                        placeholder = { Text("Details (lines starting with '- ' show as bullets)") },
+                        minLines = 3,
+                        maxLines = 5,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("task_desc_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Contextual Formatting utility buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Format Selection:",
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 6.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        )
+                        
+                        // Bold Button
+                        IconButton(
+                            onClick = {
+                                val text = descriptionValue.text
+                                val selection = descriptionValue.selection
+                                if (selection.start != selection.end) {
+                                    val selectedText = text.substring(selection.start, selection.end)
+                                    val formatted = "<**$selectedText**>"
+                                    val newText = text.replaceRange(selection.start, selection.end, formatted)
+                                    val head = selection.start + 3
+                                    descriptionValue = TextFieldValue(
+                                        text = newText,
+                                        selection = TextRange(head, head + selectedText.length)
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Select description text to format bold", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("B", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        // Italic Button
+                        IconButton(
+                            onClick = {
+                                val text = descriptionValue.text
+                                val selection = descriptionValue.selection
+                                if (selection.start != selection.end) {
+                                    val selectedText = text.substring(selection.start, selection.end)
+                                    val formatted = "<__${selectedText}__>"
+                                    val newText = text.replaceRange(selection.start, selection.end, formatted)
+                                    val head = selection.start + 3
+                                    descriptionValue = TextFieldValue(
+                                        text = newText,
+                                        selection = TextRange(head, head + selectedText.length)
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Select description text to format italic", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Text("I", fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        // Short-cut for Bullet Point insertion at cursor position
+                        IconButton(
+                            onClick = {
+                                val text = descriptionValue.text
+                                val selection = descriptionValue.selection
+                                val replacement = if (text.isEmpty() || text.endsWith("\n")) "- " else "\n- "
+                                val newText = text.replaceRange(selection.start, selection.end, replacement)
+                                descriptionValue = TextFieldValue(
+                                    text = newText,
+                                    selection = TextRange(selection.start + replacement.length)
+                                )
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.List,
+                                contentDescription = "Insert Bullet Point",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                // Priority Selector with Up/Down buttons + Colors Box
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Priority Level",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = when (priority) {
+                                1 -> "Level 1: Urgent (Red)"
+                                2 -> "Level 2: High (Orange)"
+                                3 -> "Level 3: Medium (Amber)"
+                                4 -> "Level 4: Low (Mint/Yellow)"
+                                else -> "Level $priority"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Color Highlight Box showing current level
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    when (priority) {
+                                        1 -> PriorityRed
+                                        2 -> PriorityOrange
+                                        3 -> PriorityAmber
+                                        4 -> PriorityYellow
+                                        else -> Color.Gray
+                                    }
+                                )
+                                .border(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = priority.toString(),
+                                fontWeight = FontWeight.Bold,
+                                color = if (priority == 4) Color.DarkGray else Color.White
+                            )
+                        }
+
+                        // Decrement Priority (Arrow Down) -> Moves to 4
+                        IconButton(
+                            onClick = { if (priority < 4) priority++ },
+                            enabled = priority < 4
+                        ) {
+                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Lower Priority")
+                        }
+
+                        // Increment Priority (Arrow Up) -> Moves to 1
+                        IconButton(
+                            onClick = { if (priority > 1) priority-- },
+                            enabled = priority > 1
+                        ) {
+                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Raise Priority")
+                        }
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                // Reminder notification setup for urgent tasks
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "\uD83D\uDD14 Reminder Notification",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = if (reminderTimestamp != null) {
+                                val sdf = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
+                                "Trigger on: " + sdf.format(Date(reminderTimestamp!!))
+                            } else {
+                                "Set an alert for this task"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (reminderTimestamp != null) {
+                            IconButton(onClick = { reminderTimestamp = null }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Clear reminder",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        
+                        Button(
+                            onClick = {
+                                val currentCal = Calendar.getInstance()
+                                DatePickerDialog(
+                                    context,
+                                    { _, year, month, dayOfMonth ->
+                                        val pickedCal = Calendar.getInstance().apply {
+                                            set(Calendar.YEAR, year)
+                                            set(Calendar.MONTH, month)
+                                            set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                                        }
+                                        
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hourOfDay, minute ->
+                                                pickedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                                pickedCal.set(Calendar.MINUTE, minute)
+                                                pickedCal.set(Calendar.SECOND, 0)
+                                                pickedCal.set(Calendar.MILLISECOND, 0)
+                                                
+                                                if (pickedCal.timeInMillis > System.currentTimeMillis()) {
+                                                    reminderTimestamp = pickedCal.timeInMillis
+                                                } else {
+                                                    Toast.makeText(context, "Reminder must be set in the future!", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            currentCal.get(Calendar.HOUR_OF_DAY),
+                                            currentCal.get(Calendar.MINUTE),
+                                            false
+                                        ).show()
+                                    },
+                                    currentCal.get(Calendar.YEAR),
+                                    currentCal.get(Calendar.MONTH),
+                                    currentCal.get(Calendar.DAY_OF_MONTH)
+                                ).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Text(if (reminderTimestamp == null) "Schedule" else "Edit")
+                        }
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                // Everyday recurrence auto-add option
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "\uD83D\uDD04 Auto-Add Everyday",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val intervals = listOf(
+                            Pair(0, "No Recurrence"),
+                            Pair(7, "Next 7 Days"),
+                            Pair(14, "Next 14 Days"),
+                            Pair(30, "Next 30 Days")
+                        )
+
+                        intervals.forEach { (days, label) ->
+                            val selected = everydayCount == days
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primaryContainer 
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (selected) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { everydayCount = days }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Future Clone Dates Multiselection Bar
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "\uD83D\uDCC5 Also Add to Custom Future Dates",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(nextDays) { dayCal ->
+                            val dbStr = dbFormatter.format(dayCal.time)
+                            val label = dayFormatter.format(dayCal.time)
+                            val isSelected = replicationDates.contains(dbStr)
+
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable {
+                                        if (isSelected) {
+                                            replicationDates.remove(dbStr)
+                                        } else {
+                                            replicationDates.add(dbStr)
+                                        }
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Footer Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancel")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Button(
+                        onClick = {
+                            if (title.isBlank()) {
+                                Toast.makeText(context, "Please enter a task title", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            onConfirm(
+                                title.trim(),
+                                descriptionValue.text.trim(),
+                                priority,
+                                initialDate,
+                                replicationDates.toList(),
+                                everydayCount,
+                                reminderTimestamp
+                            )
+                        },
+                        modifier = Modifier.testTag("task_confirm_button")
+                    ) {
+                        Text("Add Task")
+                    }
+                }
+            }
+        }
+    }
+}

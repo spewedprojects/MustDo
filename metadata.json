@@ -1,0 +1,6 @@
+{
+  "name": "Soft To-Do",
+  "description": "A personal, smooth, and soft user-friendly to-do app with custom priority levels, date swiping, visual timeline, customizable B&W, pastel, and Monet themes, and urgent task notification reminders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
