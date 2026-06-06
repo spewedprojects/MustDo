@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -117,7 +118,7 @@ fun TaskAddDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "New To-Do Task",
+                        text = "New Must-Do Task",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -183,7 +184,7 @@ fun TaskAddDialog(
                                 val selection = descriptionValue.selection
                                 if (selection.start != selection.end) {
                                     val selectedText = text.substring(selection.start, selection.end)
-                                    val formatted = "<**$selectedText**>"
+                                    val formatted = "**$selectedText**"
                                     val newText = text.replaceRange(selection.start, selection.end, formatted)
                                     val head = selection.start + 3
                                     descriptionValue = TextFieldValue(
@@ -206,7 +207,7 @@ fun TaskAddDialog(
                                 val selection = descriptionValue.selection
                                 if (selection.start != selection.end) {
                                     val selectedText = text.substring(selection.start, selection.end)
-                                    val formatted = "<__${selectedText}__>"
+                                    val formatted = "__${selectedText}__"
                                     val newText = text.replaceRange(selection.start, selection.end, formatted)
                                     val head = selection.start + 3
                                     descriptionValue = TextFieldValue(
@@ -330,7 +331,7 @@ fun TaskAddDialog(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "\uD83D\uDD14 Reminder Notification",
+                            text = "Reminder Notification",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                         )
                         Text(
@@ -410,7 +411,7 @@ fun TaskAddDialog(
                 // Everyday recurrence auto-add option
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "\uD83D\uDD04 Auto-Add Everyday",
+                        text = "Auto-Add Everyday",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -420,7 +421,7 @@ fun TaskAddDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val intervals = listOf(
-                            Pair(0, "No Recurrence"),
+                            Pair(0, "No"),
                             Pair(7, "Next 7 Days"),
                             Pair(14, "Next 14 Days"),
                             Pair(30, "Next 30 Days")
@@ -451,7 +452,8 @@ fun TaskAddDialog(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                            else MaterialTheme.colorScheme.onSurface
+                                            else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                             }
                         }
@@ -461,7 +463,7 @@ fun TaskAddDialog(
                 // Future Clone Dates Multiselection Bar
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "\uD83D\uDCC5 Also Add to Custom Future Dates",
+                        text = "Also Add to Custom Future Dates",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -547,5 +549,18 @@ fun TaskAddDialog(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun TaskAddDialogPreview() {
+    SoftTodoTheme {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _ -> }
+        )
     }
 }

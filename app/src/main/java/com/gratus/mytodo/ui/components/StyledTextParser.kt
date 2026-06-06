@@ -10,7 +10,7 @@ import androidx.compose.ui.text.style.TextDecoration
  * Parses user input to create rich Styled Text strings.
  * - Bold: parses standard markdown **text** and custom <**text**> tags.
  * - Italic: parses standard markdown __text__ and custom <__text__> tags.
- * - Bullet list: prefix lines with "- " to compile clean, indented â€¢ dot indicators.
+ * - Bullet list: prefix lines with "- " to compile clean, indented • dot indicators.
  */
 fun parseStyledDescription(text: String): AnnotatedString {
     val builder = AnnotatedString.Builder()
@@ -22,7 +22,7 @@ fun parseStyledDescription(text: String): AnnotatedString {
         
         // Convert "- " bullet points into visually structured elements
         val processedLine = if (isBullet) {
-            "  â€¢ " + trimmed.substring(2)
+            "  • " + trimmed.substring(2)
         } else {
             line
         }

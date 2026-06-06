@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
@@ -45,15 +46,43 @@ fun HomeScreen(
     onOpenDrawer: () -> Unit,
     colorSchemeType: String
 ) {
-    val context = LocalContext.current
     val currentDate by viewModel.currentDate.collectAsState()
     val tasks by viewModel.homeTasks.collectAsState(initial = emptyList())
     val lastUsedPriority by viewModel.lastUsedPriority.collectAsState()
-    val sortOption by viewModel.sortingOption.collectAsState()
 
+    HomeScreenContent(
+        currentDate = currentDate,
+        tasks = tasks,
+        lastUsedPriority = lastUsedPriority,
+        colorSchemeType = colorSchemeType,
+        onNavigateDate = { viewModel.navigateDate(it) },
+        onSetDate = { viewModel.setDate(it) },
+        onToggleComplete = { viewModel.toggleCompleted(it) },
+        onDeleteTask = { viewModel.deleteTask(it) },
+        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
+            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
+        }
+    )
+}
+
+/**
+ * Stateless version of HomeScreen for preview and testing.
+ */
+@Composable
+fun HomeScreenContent(
+    currentDate: Calendar,
+    tasks: List<Task>,
+    lastUsedPriority: Int,
+    colorSchemeType: String,
+    onNavigateDate: (Int) -> Unit,
+    onSetDate: (Calendar) -> Unit,
+    onToggleComplete: (Task) -> Unit,
+    onDeleteTask: (Task) -> Unit,
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?) -> Unit
+) {
+    val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val dbFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     val dateLabelFormatter = SimpleDateFormat("EEEE, MMM dd, yyyy", Locale.getDefault())
 
     // Simple Swipe detection to change focused date
@@ -64,10 +93,10 @@ fun HomeScreen(
             onDragEnd = {
                 if (dragAmountCum > 150f) {
                     // Swiped light-to-right -> Go to PREVIOUS date
-                    viewModel.navigateDate(-1)
+                    onNavigateDate(-1)
                 } else if (dragAmountCum < -150f) {
                     // Swiped right-to-left -> Go to NEXT date
-                    viewModel.navigateDate(1)
+                    onNavigateDate(1)
                 }
             },
             onHorizontalDrag = { change, dragAmount ->
@@ -107,7 +136,7 @@ fun HomeScreen(
                                     set(Calendar.MONTH, m)
                                     set(Calendar.DAY_OF_MONTH, d)
                                 }
-                                viewModel.setDate(cal)
+                                onSetDate(cal)
                             },
                             currentDate.get(Calendar.YEAR),
                             currentDate.get(Calendar.MONTH),
@@ -185,8 +214,8 @@ fun HomeScreen(
                         TaskItemCard(
                             task = task,
                             colorSchemeType = colorSchemeType,
-                            onToggleComplete = { viewModel.toggleCompleted(task) },
-                            onDelete = { viewModel.deleteTask(task) }
+                            onToggleComplete = { onToggleComplete(task) },
+                            onDelete = { onDeleteTask(task) }
                         )
                     }
                 }
@@ -214,8 +243,8 @@ fun HomeScreen(
             initialDate = currentDate,
             lastUsedPriority = lastUsedPriority,
             onDismiss = { showAddDialog = false },
-            onConfirm = { t, d, p, date, cloneDates, everyday, alarmTime ->
-                viewModel.addTask(t, d, p, date, cloneDates, everyday, alarmTime)
+            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
+                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
                 showAddDialog = false
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
             }
@@ -309,7 +338,7 @@ fun TaskItemCard(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Mark done status",
                         tint = if (colorSchemeType == "minimal") Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 } else {
                     if (colorSchemeType != "minimal") {
@@ -317,7 +346,7 @@ fun TaskItemCard(
                             imageVector = Icons.Default.RadioButtonUnchecked,
                             contentDescription = "Mark done status",
                             tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -383,7 +412,7 @@ fun TaskItemCard(
 
             Box(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(badgeStyle.containerColor)
                     .border(
@@ -396,7 +425,7 @@ fun TaskItemCard(
                 Text(
                     text = task.priority.toString(),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = badgeStyle.contentColor
                 )
             }
@@ -410,7 +439,7 @@ fun TaskItemCard(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Task",
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -443,3 +472,58 @@ fun getPriorityBoxColor(priority: Int, isCompleted: Boolean): Color {
         else -> Color.Gray
     }
 }
+
+@Preview(showBackground = true, name = "HomeScreen - Minimal Theme")
+@Composable
+fun HomeScreenMinimalPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            tasks = sampleTasks,
+            lastUsedPriority = 1,
+            colorSchemeType = "minimal",
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "HomeScreen - Simple Theme")
+@Composable
+fun HomeScreenSimplePreview() {
+    SoftTodoTheme(colorSchemeType = "simple") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            tasks = sampleTasks,
+            lastUsedPriority = 1,
+            colorSchemeType = "simple",
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Task Item Card")
+@Composable
+fun TaskItemCardPreview() {
+    SoftTodoTheme {
+        TaskItemCard(
+            task = sampleTasks[0],
+            colorSchemeType = "minimal",
+            onToggleComplete = {},
+            onDelete = {}
+        )
+    }
+}
+
+private val sampleTasks = listOf(
+    Task(id = 1, title = "Finish Project Proposal", description = "Finalize the budget and timeline", priority = 1, dateAdded = "2023-10-27", isCompleted = false),
+    Task(id = 2, title = "Grocery Shopping", description = "Milk, Eggs, Bread, Fruits", priority = 2, dateAdded = "2023-10-27", isCompleted = true),
+    Task(id = 3, title = "Gym Workout", description = "Leg day", priority = 3, dateAdded = "2023-10-27", isCompleted = false)
+)

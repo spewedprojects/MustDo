@@ -23,24 +23,45 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.ui.MainViewModel
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import java.io.File
 
 /**
  * SettingsScreen includes theme configurations, color scheme selectors, and backups.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
     colorSchemeType: String
 ) {
-    val context = LocalContext.current
     val activeTheme by viewModel.settingsTheme.collectAsState()
     val activeScheme by viewModel.settingsColorScheme.collectAsState()
 
+    SettingsScreenContent(
+        activeTheme = activeTheme,
+        activeScheme = activeScheme,
+        onThemeChange = { viewModel.setTheme(it) },
+        onSchemeChange = { viewModel.setColorScheme(it) },
+        onExportBackup = { viewModel.exportBackup() },
+        onImportBackup = { text, onComplete -> viewModel.importBackup(text, onComplete) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreenContent(
+    activeTheme: String,
+    activeScheme: String,
+    onThemeChange: (String) -> Unit,
+    onSchemeChange: (String) -> Unit,
+    onExportBackup: () -> String,
+    onImportBackup: (String, (Boolean) -> Unit) -> Unit
+) {
+    val context = LocalContext.current
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
 
@@ -62,7 +83,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "\uD83C\uDFA8 Aesthetics Settings",
+                    text = "Aesthetics Settings",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -98,7 +119,7 @@ fun SettingsScreen(
                                         else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                                         RoundedCornerShape(8.dp)
                                     )
-                                    .clickable { viewModel.setTheme(mode) }
+                                    .clickable { onThemeChange(mode) }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -141,7 +162,7 @@ fun SettingsScreen(
                                     else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
                                     RoundedCornerShape(12.dp)
                                 )
-                                .clickable { viewModel.setColorScheme(schemeKey) }
+                                .clickable { onSchemeChange(schemeKey) }
                                 .padding(14.dp)
                         ) {
                             Row(
@@ -169,12 +190,12 @@ fun SettingsScreen(
                                         Text(
                                             text = name,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
+                                            fontSize = 14.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = desc,
-                                            fontSize = 10.sp,
+                                            fontSize = 12.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                             lineHeight = 13.sp
                                         )
@@ -183,7 +204,7 @@ fun SettingsScreen(
 
                                 RadioButton(
                                     selected = isSelected,
-                                    onClick = { viewModel.setColorScheme(schemeKey) },
+                                    onClick = { onSchemeChange(schemeKey) },
                                     colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
                                 )
                             }
@@ -204,7 +225,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "\uD83D\uDCBE Safety Backups & Restorations",
+                    text = "Backups & Restorations",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -225,7 +246,7 @@ fun SettingsScreen(
                     // Export to Clipboard Button
                     Button(
                         onClick = {
-                            val backupStr = viewModel.exportBackup()
+                            val backupStr = onExportBackup()
                             if (backupStr.isNotBlank()) {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                 val clip = ClipData.newPlainText("Soft To-Do Backup Record", backupStr)
@@ -262,7 +283,7 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             try {
-                                val backupStr = viewModel.exportBackup()
+                                val backupStr = onExportBackup()
                                 if (backupStr.isNotBlank()) {
                                     val folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                                     val file = File(folder, "soft_todo_backup.json")
@@ -322,7 +343,7 @@ fun SettingsScreen(
                             Toast.makeText(context, "Please paste valid JSON backup text first", Toast.LENGTH_SHORT).show()
                             return@Button
                         }
-                        viewModel.importBackup(importText) { success ->
+                        onImportBackup(importText) { success ->
                             if (success) {
                                 showImportDialog = false
                                 importText = ""
@@ -342,6 +363,21 @@ fun SettingsScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SettingsScreenPreview() {
+    SoftTodoTheme {
+        SettingsScreenContent(
+            activeTheme = "light",
+            activeScheme = "minimal",
+            onThemeChange = {},
+            onSchemeChange = {},
+            onExportBackup = { "" },
+            onImportBackup = { _, _ -> }
         )
     }
 }

@@ -124,10 +124,10 @@ fun MainLayout(
                         .padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "\uD83D\uDCC5 My To-Do",
+                        text = "MustDo",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Black,
-                            letterSpacing = (-0.5).sp
+                            letterSpacing = (0.5).sp
                         ),
                         color = MaterialTheme.colorScheme.primary
                     )

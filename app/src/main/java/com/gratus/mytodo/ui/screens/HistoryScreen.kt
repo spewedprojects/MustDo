@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
@@ -40,24 +42,54 @@ import java.util.*
 /**
  * Historical records screen with filtering, date classification, visual zoom, and pinch-to-zoom.
  */
-@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
     colorSchemeType: String
 ) {
-    val context = LocalContext.current
     val tasks by viewModel.historyTasks.collectAsState(initial = emptyList())
     val query by viewModel.searchQuery.collectAsState()
     val zoomLevel by viewModel.historyZoomLevel.collectAsState()
     val displayType by viewModel.historyDisplayType.collectAsState()
     val activeFilter by viewModel.historyFilter.collectAsState()
 
-    val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val titleSdf = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
+    HistoryScreenContent(
+        tasks = tasks,
+        query = query,
+        zoomLevel = zoomLevel,
+        displayType = displayType,
+        activeFilter = activeFilter,
+        colorSchemeType = colorSchemeType,
+        onQueryChange = { viewModel.setSearchQuery(it) },
+        onZoomChange = { viewModel.zoomHistory(it) },
+        onDisplayTypeChange = { viewModel.setHistoryDisplay(it) },
+        onFilterChange = { viewModel.setHistoryFilter(it) }
+    )
+}
+
+/**
+ * Stateless version of HistoryScreen for preview and testing.
+ */
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryScreenContent(
+    tasks: List<Task>,
+    query: String,
+    zoomLevel: Int,
+    displayType: DisplayType,
+    activeFilter: FilterOption,
+    colorSchemeType: String,
+    onQueryChange: (String) -> Unit,
+    onZoomChange: (Int) -> Unit,
+    onDisplayTypeChange: (DisplayType) -> Unit,
+    onFilterChange: (FilterOption) -> Unit
+) {
+    val context = LocalContext.current
+    val sdf = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    val titleSdf = remember { SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault()) }
 
     // State to throttling scale gestures
-    var lastGestureTime by remember { mutableStateOf(0L) }
+    var lastGestureTime by remember { mutableLongStateOf(0L) }
 
     // Pinch to Zoom math utilizing pointers transform detector
     val pinchZoomModifier = Modifier.pointerInput(Unit) {
@@ -65,10 +97,10 @@ fun HistoryScreen(
             val now = System.currentTimeMillis()
             if (now - lastGestureTime < 150) return@detectTransformGestures // Debounce rate
             if (zoom > 1.25f) {
-                viewModel.zoomHistory(1) // zoom in
+                onZoomChange(1) // zoom in
                 lastGestureTime = now
             } else if (zoom < 0.75f) {
-                viewModel.zoomHistory(-1) // zoom out
+                onZoomChange(-1) // zoom out
                 lastGestureTime = now
             }
         }
@@ -96,12 +128,12 @@ fun HistoryScreen(
                 // Search Bar
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { viewModel.setSearchQuery(it) },
+                    onValueChange = { onQueryChange(it) },
                     placeholder = { Text("Search title, description...") },
                     leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                            IconButton(onClick = { onQueryChange("") }) {
                                 Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear search")
                             }
                         }
@@ -136,7 +168,7 @@ fun HistoryScreen(
                                         set(Calendar.DAY_OF_MONTH, dayOfMonth)
                                     }
                                     val queryStr = sdf.format(picked.time)
-                                    viewModel.setSearchQuery(queryStr) // Filter by picked date
+                                    onQueryChange(queryStr) // Filter by picked date
                                 },
                                 calendar.get(Calendar.YEAR),
                                 calendar.get(Calendar.MONTH),
@@ -159,7 +191,7 @@ fun HistoryScreen(
                             )
                     ) {
                         IconButton(
-                            onClick = { viewModel.setHistoryDisplay(DisplayType.LIST) },
+                            onClick = { onDisplayTypeChange(DisplayType.LIST) },
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(
@@ -168,7 +200,7 @@ fun HistoryScreen(
                                 )
                         ) {
                             Icon(
-                                imageVector = Icons.Default.List,
+                                imageVector = Icons.AutoMirrored.Filled.List,
                                 contentDescription = "List display option",
                                 tint = if (displayType == DisplayType.LIST) MaterialTheme.colorScheme.onPrimaryContainer 
                                        else MaterialTheme.colorScheme.onSurface,
@@ -176,7 +208,7 @@ fun HistoryScreen(
                             )
                         }
                         IconButton(
-                            onClick = { viewModel.setHistoryDisplay(DisplayType.GROUPED) },
+                            onClick = { onDisplayTypeChange(DisplayType.GROUPED) },
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(
@@ -213,7 +245,7 @@ fun HistoryScreen(
                             val active = activeFilter == opt
                             Box(
                                 modifier = Modifier
-                                    .clickable { viewModel.setHistoryFilter(opt) }
+                                    .clickable { onFilterChange(opt) }
                                     .background(
                                         if (active) MaterialTheme.colorScheme.secondaryContainer 
                                         else Color.Transparent
@@ -244,7 +276,7 @@ fun HistoryScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = { viewModel.zoomHistory(-1) },
+                            onClick = { onZoomChange(-1) },
                             enabled = zoomLevel > 1,
                             modifier = Modifier.size(32.dp)
                         ) {
@@ -259,7 +291,7 @@ fun HistoryScreen(
                         )
 
                         IconButton(
-                            onClick = { viewModel.zoomHistory(1) },
+                            onClick = { onZoomChange(1) },
                             enabled = zoomLevel < 5,
                             modifier = Modifier.size(32.dp)
                         ) {
@@ -353,7 +385,7 @@ fun HistoryScreen(
                                     }
                                 }
 
-                                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
                                 groupTasks.forEach { task ->
                                     ZoomableTaskRow(task, zoomLevel, colorSchemeType)
@@ -501,7 +533,7 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
                     )
                     // Display tiny date if not in Grouped mode
                     Text(
-                        text = "â€¢ " + task.dateAdded,
+                        text = "• " + task.dateAdded,
                         fontSize = if (zoomLevel == 1) 8.sp else 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -554,3 +586,40 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
         }
     }
 }
+
+@Preview(showBackground = true, name = "History Screen - Colorful Theme")
+@Composable
+fun HistoryScreenPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks,
+            query = "",
+            zoomLevel = 2,
+            displayType = DisplayType.GROUPED,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "colorful",
+            onQueryChange = {},
+            onZoomChange = {},
+            onDisplayTypeChange = {},
+            onFilterChange = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Zoomable Task Row")
+@Composable
+fun ZoomableTaskRowPreview() {
+    SoftTodoTheme {
+        ZoomableTaskRow(
+            task = sampleHistoryTasks[0],
+            zoomLevel = 3,
+            colorSchemeType = "minimal"
+        )
+    }
+}
+
+private val sampleHistoryTasks = listOf(
+    Task(id = 1, title = "Finish Project Proposal", description = "Finalize the budget and timeline", priority = 1, dateAdded = "2023-10-25", isCompleted = true),
+    Task(id = 2, title = "Grocery Shopping", description = "Milk, Eggs, Bread, Fruits", priority = 2, dateAdded = "2023-10-25", isCompleted = true),
+    Task(id = 3, title = "Gym Workout", description = "Leg day", priority = 3, dateAdded = "2023-10-24", isCompleted = false)
+)
