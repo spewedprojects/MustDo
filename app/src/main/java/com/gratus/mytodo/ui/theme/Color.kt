@@ -39,12 +39,14 @@ val MinimalLightBg = Color(0xFFF7F2FA)
 val MinimalLightText = Color(0xFF1E293B)          // Slate 800
 val MinimalLightAccent = Color(0xFF6366F1)        // Indigo 500
 val MinimalLightCard = Color(0x99FFFFFF)          // bg-white/60 layer over lavender
+
+val MinimalLightCard2 = Color(0xFFFCFAFD)        // bg-white/60 layer over lavender - but solid
 val MinimalLightCardBorder = Color(0x66FFFFFF)    // border-white/40
 
 val MinimalDarkBg = Color(0xFF0F0E13)
 val MinimalDarkText = Color(0xFFF1F5F9)           // Slate 100
 val MinimalDarkAccent = Color(0xFF818CF8)         // Indigo 400
-val MinimalDarkCard = Color(0x661E1B26)           // bg-dark/40 layer over midnight-lilac
+val MinimalDarkCard = Color(0xFF0F0E13)           // bg-dark/40 layer over midnight-lilac
 val MinimalDarkCardBorder = Color(0x22FFFFFF)     // border-white/10
 
 val MinimalP1BagBg = Color(0xFFFFE4E6)            // bg-rose-100

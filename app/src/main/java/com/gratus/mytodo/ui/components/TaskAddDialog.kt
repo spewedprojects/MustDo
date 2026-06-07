@@ -33,9 +33,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.theme.*
-import java.text.SimpleDateFormat
+import com.gratus.mytodo.ui.utils.DateTimeUtils
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.ui.text.style.TextAlign
 import java.util.*
 
 /**
@@ -55,30 +60,30 @@ fun TaskAddDialog(
         replicateDates: List<String>,
         everydayCount: Int,
         reminderTimeMillis: Long?
-    ) -> Unit
+    ) -> Unit,
+    taskToEdit: Task? = null
 ) {
     val context = LocalContext.current
 
-    var title by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(taskToEdit?.title ?: "") }
     // Description text state holds TextFieldValue for selection range tracking & formatting injection.
-    var descriptionValue by remember { mutableStateOf(TextFieldValue("")) }
+    var descriptionValue by remember { mutableStateOf(TextFieldValue(taskToEdit?.description ?: "")) }
     
     // Priority state defaults to last used priority
-    var priority by remember { mutableStateOf(lastUsedPriority.coerceIn(1, 4)) }
+    var priority by remember { mutableStateOf(taskToEdit?.priority ?: lastUsedPriority.coerceIn(1, 4)) }
 
     // Alarm reminder state (timestamp milliseconds)
-    var reminderTimestamp by remember { mutableStateOf<Long?>(null) }
+    var reminderTimestamp by remember { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
 
     // Recurrence selection
     var everydayCount by remember { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
     val replicationDates = remember { mutableStateListOf<String>() }
+    var showRangePickerDialog by remember { mutableStateOf(false) }
 
     // Calendar instances for rendering next 7 days clone option
     val nextDays = remember {
         val list = mutableListOf<Calendar>()
-        val start = Calendar.getInstance()
-        // we start from tomorrows date
-        for (i in 1..7) {
+        for (i in 1..3) {
             val d = Calendar.getInstance().apply {
                 add(Calendar.DAY_OF_YEAR, i)
             }
@@ -86,8 +91,6 @@ fun TaskAddDialog(
         }
         list
     }
-    val dayFormatter = SimpleDateFormat("EEE dd", Locale.getDefault())
-    val dbFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -118,7 +121,7 @@ fun TaskAddDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "New Must-Do Task",
+                        text = if (taskToEdit == null) "New Must-Do Task" else "Edit Task",
                         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -172,7 +175,7 @@ fun TaskAddDialog(
                     ) {
                         Text(
                             text = "Format Selection:",
-                            fontSize = 11.sp,
+                            fontSize = AppFontSizes.extraSmall,
                             modifier = Modifier.padding(start = 6.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                         )
@@ -336,8 +339,7 @@ fun TaskAddDialog(
                         )
                         Text(
                             text = if (reminderTimestamp != null) {
-                                val sdf = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
-                                "Trigger on: " + sdf.format(Date(reminderTimestamp!!))
+                                "Trigger on: " + DateTimeUtils.formatAlarmDate(reminderTimestamp!!)
                             } else {
                                 "Set an alert for this task"
                             },
@@ -406,107 +408,154 @@ fun TaskAddDialog(
                     }
                 }
 
-                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                if (taskToEdit == null) {
+                    Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                // Everyday recurrence auto-add option
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Auto-Add Everyday",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val intervals = listOf(
-                            Pair(0, "No"),
-                            Pair(7, "Next 7 Days"),
-                            Pair(14, "Next 14 Days"),
-                            Pair(30, "Next 30 Days")
+                    // Everyday recurrence auto-add option
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Auto-Add Everyday",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        intervals.forEach { (days, label) ->
-                            val selected = everydayCount == days
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primaryContainer 
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val intervals = listOf(
+                                Pair(0, "No"),
+                                Pair(7, "Next 7 Days"),
+                                Pair(14, "Next 14 Days"),
+                                Pair(30, "Next 30 Days")
+                            )
+
+                            intervals.forEach { (days, label) ->
+                                val selected = everydayCount == days
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (selected) MaterialTheme.colorScheme.primaryContainer 
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { everydayCount = days }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        textAlign = TextAlign.Center,
+                                        fontSize = AppFontSizes.extraSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
+                                                else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
                                     )
-                                    .border(
-                                        1.dp,
-                                        if (selected) MaterialTheme.colorScheme.primary 
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { everydayCount = days }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                            else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1
-                                )
+                                }
                             }
                         }
                     }
-                }
 
-                // Future Clone Dates Multiselection Bar
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Also Add to Custom Future Dates",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // Future Clone Dates Multiselection Bar
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Also Add to Custom Future Dates",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(nextDays) { dayCal ->
-                            val dbStr = dbFormatter.format(dayCal.time)
-                            val label = dayFormatter.format(dayCal.time)
-                            val isSelected = replicationDates.contains(dbStr)
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            items(nextDays) { dayCal ->
+                                val dbStr = DateTimeUtils.formatDbDate(dayCal)
+                                val label = DateTimeUtils.formatAddDialogDay(dayCal)
+                                val isSelected = replicationDates.contains(dbStr)
 
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary 
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable {
-                                        if (isSelected) {
-                                            replicationDates.remove(dbStr)
-                                        } else {
-                                            replicationDates.add(dbStr)
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable {
+                                            if (isSelected) {
+                                                replicationDates.remove(dbStr)
+                                            } else {
+                                                replicationDates.add(dbStr)
+                                            }
                                         }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = AppFontSizes.small,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary 
+                                                else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+
+                            item {
+                                val isRangeActive = replicationDates.any { dateStr ->
+                                    !nextDays.any { DateTimeUtils.formatDbDate(it) == dateStr }
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(
+                                            if (isRangeActive) MaterialTheme.colorScheme.secondary
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isRangeActive) MaterialTheme.colorScheme.secondary
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .clickable { showRangePickerDialog = true }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DateRange,
+                                            contentDescription = null,
+                                            tint = if (isRangeActive) MaterialTheme.colorScheme.onSecondary 
+                                                   else MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (isRangeActive) "Range Selected" else "+ Custom Range...",
+                                            fontSize = AppFontSizes.small,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isRangeActive) MaterialTheme.colorScheme.onSecondary 
+                                                    else MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary 
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
+                                }
                             }
                         }
                     }
@@ -544,10 +593,57 @@ fun TaskAddDialog(
                         },
                         modifier = Modifier.testTag("task_confirm_button")
                     ) {
-                        Text("Add Task")
+                        Text(if (taskToEdit == null) "Add Task" else "Save Changes")
                     }
                 }
             }
+        }
+    }
+
+    // Custom Date Range Picker Dialog for replication selection
+    if (showRangePickerDialog) {
+        val dateRangePickerState = rememberDateRangePickerState()
+        DatePickerDialog(
+            onDismissRequest = { showRangePickerDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val startMillis = dateRangePickerState.selectedStartDateMillis
+                        val endMillis = dateRangePickerState.selectedEndDateMillis
+                        if (startMillis != null && endMillis != null) {
+                            val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
+                            val endCal = Calendar.getInstance().apply { timeInMillis = endMillis }
+
+                            val dates = mutableListOf<String>()
+                            val cursor = startCal.clone() as Calendar
+                            while (!cursor.after(endCal)) {
+                                dates.add(DateTimeUtils.formatDbDate(cursor))
+                                cursor.add(Calendar.DAY_OF_YEAR, 1)
+                            }
+                            replicationDates.clear()
+                            replicationDates.addAll(dates)
+                        } else if (startMillis != null) {
+                            val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
+                            replicationDates.clear()
+                            replicationDates.add(DateTimeUtils.formatDbDate(startCal))
+                        }
+                        showRangePickerDialog = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRangePickerDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DateRangePicker(
+                state = dateRangePickerState,
+                modifier = Modifier.weight(1f).padding(16.dp),
+                title = { Text("Pick Replication Range", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
+            )
         }
     }
 }

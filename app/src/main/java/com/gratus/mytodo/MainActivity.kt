@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -37,10 +38,12 @@ import com.gratus.mytodo.ui.screens.HistoryScreen
 import com.gratus.mytodo.ui.screens.HomeScreen
 import com.gratus.mytodo.ui.screens.SettingsScreen
 import com.gratus.mytodo.ui.screens.StatsScreen
+import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
+import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.*
+import androidx.compose.ui.res.stringResource
 
 /**
  * MainActivity is the host core of the Soft To-Do application.
@@ -98,22 +101,31 @@ fun MainLayout(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val context = LocalContext.current
 
     val activeScreen by viewModel.activeScreen.collectAsState()
     val focusDate by viewModel.currentDate.collectAsState()
     val sortOption by viewModel.sortingOption.collectAsState()
 
-    val dateLabelFormatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    if (activeScreen != Screen.HOME) {
+        androidx.activity.compose.BackHandler {
+            viewModel.setActiveScreen(Screen.HOME)
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier
-                    .width(280.dp)
+                    .width(300.dp)
                     .testTag("nav_drawer_sheet"),
                 drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerContainerColor = if (colorSchemeType == "minimal" || colorSchemeType == "colorful") {
+                    MaterialTheme.colorScheme.background
+                } else {
+                    MaterialTheme.colorScheme.surface
+                },
                 drawerTonalElevation = 4.dp
             ) {
                 Spacer(modifier = Modifier.height(28.dp))
@@ -133,7 +145,7 @@ fun MainLayout(
                     )
                     Text(
                         text = "Time-locked task tracker",
-                        fontSize = 11.sp,
+                        fontSize = AppFontSizes.extraSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
@@ -149,15 +161,15 @@ fun MainLayout(
                 val navItems = listOf(
                     Triple(Screen.HOME, "Home", Icons.Default.Home),
                     Triple(Screen.HISTORY, "History Records", Icons.Default.History),
-                    Triple(Screen.STATS, "Statistics Analyzer", Icons.Default.Analytics),
-                    Triple(Screen.SETTINGS, "Aesthetic Settings", Icons.Default.Settings)
+                    Triple(Screen.STATS, "Stats Analyzer", Icons.Default.Analytics),
+                    Triple(Screen.SETTINGS, "App Settings", Icons.Default.Settings)
                 )
 
                 navItems.forEach { (screenKey, name, icon) ->
                     val isSelected = activeScreen == screenKey
                     NavigationDrawerItem(
                         icon = { Icon(imageVector = icon, contentDescription = name) },
-                        label = { Text(name, fontWeight = FontWeight.Bold, fontSize = 13.sp) },
+                        label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
                         selected = isSelected,
                         onClick = {
                             viewModel.setActiveScreen(screenKey)
@@ -181,8 +193,8 @@ fun MainLayout(
                 
                 // Fine signature branding in drawer footer
                 Text(
-                    text = "v1.0.0 • Personal Edition",
-                    fontSize = 10.sp,
+                    text = stringResource(R.string.app_version),
+                    fontSize = AppFontSizes.micro,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -220,7 +232,7 @@ fun MainLayout(
                                     }
                                     
                                     Text(
-                                        text = dateLabelFormatter.format(focusDate.time),
+                                        text = DateTimeUtils.formatMainHeader(focusDate),
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
@@ -244,7 +256,7 @@ fun MainLayout(
                                         Screen.HISTORY -> "Historical Timelines"
                                         Screen.STATS -> "Completion Statistics"
                                         Screen.SETTINGS -> "Settings Profile"
-                                        else -> "Soft To-Do"
+                                        else -> "MustDo"
                                     },
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                     color = MaterialTheme.colorScheme.onSurface

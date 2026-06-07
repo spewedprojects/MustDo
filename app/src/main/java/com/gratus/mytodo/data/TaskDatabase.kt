@@ -29,5 +29,14 @@ abstract class TaskDatabase : RoomDatabase() {
                 instance
             }
         }
+
+        fun closeDatabase() {
+            synchronized(this) {
+                if (INSTANCE?.isOpen == true) {
+                    INSTANCE?.close()
+                }
+                INSTANCE = null
+            }
+        }
     }
 }

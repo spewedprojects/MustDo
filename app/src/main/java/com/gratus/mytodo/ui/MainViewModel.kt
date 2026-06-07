@@ -17,9 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.json.JSONArray
-import org.json.JSONObject
-import java.text.SimpleDateFormat
+import com.gratus.mytodo.data.utils.BackupHelper
+import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.*
 
 /**
@@ -93,7 +92,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _historyZoomLevel = MutableStateFlow(3) // 1 (tight/compact) to 5 (expanded/zoomed in)
+    private val _historyZoomLevel = MutableStateFlow(2) // 0 (Year), 1 (Month), 2 (Day), 3 (Expanded)
     val historyZoomLevel: StateFlow<Int> = _historyZoomLevel.asStateFlow()
 
     private val _historyDisplayType = MutableStateFlow(DisplayType.LIST)
@@ -103,7 +102,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val historyFilter: StateFlow<FilterOption> = _historyFilter.asStateFlow()
 
     // Database Flows
-    private val dateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     init {
         val database = TaskDatabase.getDatabase(application)
@@ -141,7 +139,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Get reactive task lists for current date on Home Screen.
      */
     val homeTasks: Flow<List<Task>> = _currentDate
-        .map { cal -> dateFormatter.format(cal.time) }
+        .map { cal -> DateTimeUtils.formatDbDate(cal) }
         .flatMapLatest { dateStr -> repository.getTasksForDate(dateStr) }
         .combine(_sortingOption) { taskList, sort ->
             when (sort) {
@@ -150,6 +148,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * Get tasks list flow for a specific date (used by the smooth sliding HorizontalPager).
+     */
+    fun getTasksForDateFlow(dateStr: String): Flow<List<Task>> {
+        return repository.getTasksForDate(dateStr)
+            .combine(_sortingOption) { taskList, sort ->
+                when (sort) {
+                    SortOption.PRIORITY -> taskList.sortedBy { it.priority }
+                    SortOption.ADDED_SEQUENCE -> taskList.sortedBy { it.createdSeq }
+                }
+            }
+    }
 
     /**
      * Reactive task lists for history screen (filters applied via queries or combination).
@@ -167,7 +178,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         baseFlow.map { list ->
-            val todayStr = dateFormatter.format(System.currentTimeMillis())
+            val todayStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
             list.filter { task ->
                 when (filter) {
                     FilterOption.ALL -> true
@@ -207,7 +218,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reminderTimeMillis: Long? = null
     ) {
         viewModelScope.launch {
-            val dateStr = dateFormatter.format(targetDate.time)
+            val dateStr = DateTimeUtils.formatDbDate(targetDate)
             val baseTask = Task(
                 title = title,
                 description = description,
@@ -245,7 +256,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         time = targetDate.time
                         add(Calendar.DAY_OF_YEAR, i)
                     }
-                    val dailyStr = dateFormatter.format(runCal.time)
+                    val dailyStr = DateTimeUtils.formatDbDate(runCal)
                     val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null)
                     repository.insertTask(everydayTask)
                 }
@@ -265,6 +276,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (updated.isCompleted) {
                 cancelReminder(updated)
             } else if (updated.reminderTime != null && updated.reminderTime > System.currentTimeMillis()) {
+                scheduleExactReminder(updated)
+            }
+        }
+    }
+
+    /**
+     * Update task details (title, description, priority, date, alarm/reminder).
+     */
+    fun updateTaskFields(
+        id: Int,
+        title: String,
+        description: String,
+        priority: Int,
+        targetDate: Calendar,
+        reminderTimeMillis: Long? = null
+    ) {
+        viewModelScope.launch {
+            val original = repository.getTaskById(id) ?: return@launch
+            
+            // Cancel old reminder if there was one
+            cancelReminder(original)
+
+            val dateStr = DateTimeUtils.formatDbDate(targetDate)
+            val updated = original.copy(
+                title = title,
+                description = description,
+                priority = priority,
+                dateAdded = dateStr,
+                reminderTime = reminderTimeMillis
+            )
+            
+            repository.updateTask(updated)
+            
+            // Schedule new reminder if it's active and not completed
+            if (!updated.isCompleted && reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
                 scheduleExactReminder(updated)
             }
         }
@@ -345,11 +391,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun zoomHistory(direction: Int) {
         val target = _historyZoomLevel.value + direction
-        _historyZoomLevel.value = target.coerceIn(1, 5)
+        _historyZoomLevel.value = target.coerceIn(0, 3)
     }
     
     fun setHistoryZoom(level: Int) {
-        _historyZoomLevel.value = level.coerceIn(1, 5)
+        _historyZoomLevel.value = level.coerceIn(0, 3)
     }
 
     fun setHistoryDisplay(type: DisplayType) {
@@ -377,7 +423,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             var streak = 0
             if (completedDates.isNotEmpty()) {
-                val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 val today = Calendar.getInstance().apply {
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
@@ -389,11 +434,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 var indexDate = 0
                 
                 // If they completed yesterday or today, trace streak back
-                val todayStr = sdf.format(today.time)
+                val todayStr = DateTimeUtils.formatDbDate(today)
                 val yesterdayCal = Calendar.getInstance().apply {
                     add(Calendar.DAY_OF_YEAR, -1)
                 }
-                val yesterdayStr = sdf.format(yesterdayCal.time)
+                val yesterdayStr = DateTimeUtils.formatDbDate(yesterdayCal)
 
                 if (completedDates.contains(todayStr) || completedDates.contains(yesterdayStr)) {
                     // Set checkCal starting date to either today (if they completed today) or yesterday (if yesterday)
@@ -402,7 +447,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     while (true) {
-                        val currentCheckStr = sdf.format(checkCal.time)
+                        val currentCheckStr = DateTimeUtils.formatDbDate(checkCal)
                         if (completedDates.contains(currentCheckStr)) {
                             streak++
                             checkCal.add(Calendar.DAY_OF_YEAR, -1)
@@ -415,15 +460,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             // Task completion dataset over last 7 days for graphing
             val last7DaysData = mutableListOf<DailyStats>()
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val labelSdf = SimpleDateFormat("MM-dd", Locale.getDefault())
 
             for (i in 6 downTo 0) {
                 val cal = Calendar.getInstance().apply {
                     add(Calendar.DAY_OF_YEAR, -i)
                 }
-                val dateStr = sdf.format(cal.time)
-                val label = labelSdf.format(cal.time)
+                val dateStr = DateTimeUtils.formatDbDate(cal)
+                val label = DateTimeUtils.formatStatsLabel(cal)
                 val dayTasks = tasksGroupedByDate[dateStr] ?: emptyList()
                 val dayTotal = dayTasks.size
                 val dayCompleted = dayTasks.count { it.isCompleted }
@@ -439,25 +482,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun exportBackup(): String {
         return try {
-            val arr = JSONArray()
+            var json = ""
             runBlocking(Dispatchers.IO) {
-                val allTasks = TaskDatabase.getDatabase(getApplication()).taskDao().getAllTasksDirect()
-                allTasks.forEach { task ->
-                    val obj = JSONObject().apply {
-                        put("id", task.id)
-                        put("title", task.title)
-                        put("description", task.description)
-                        put("priority", task.priority)
-                        put("dateAdded", task.dateAdded)
-                        put("isCompleted", task.isCompleted)
-                        put("reminderTime", task.reminderTime ?: JSONObject.NULL)
-                        put("isRecurring", task.isRecurring)
-                        put("createdSeq", task.createdSeq)
-                    }
-                    arr.put(obj)
-                }
+                val allTasks = repository.getAllTasksDirect()
+                json = BackupHelper.exportTasksToJson(allTasks)
             }
-            arr.toString(2)
+            json
         } catch (e: Exception) {
             Log.e("MainViewModel", "Export failed: ${e.message}")
             ""
@@ -470,25 +500,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importBackup(jsonStr: String, onComplete: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
-                val arr = JSONArray(jsonStr)
-                val tasks = ArrayList<Task>()
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val reminderTime = if (obj.isNull("reminderTime")) null else obj.getLong("reminderTime")
-                    val task = Task(
-                        id = if (obj.has("id")) obj.getInt("id") else 0,
-                        title = obj.getString("title"),
-                        description = obj.getString("description"),
-                        priority = obj.getInt("priority"),
-                        dateAdded = obj.getString("dateAdded"),
-                        isCompleted = obj.getBoolean("isCompleted"),
-                        reminderTime = reminderTime,
-                        isRecurring = if (obj.has("isRecurring")) obj.getBoolean("isRecurring") else false,
-                        createdSeq = if (obj.has("createdSeq")) obj.getLong("createdSeq") else System.currentTimeMillis()
-                    )
-                    tasks.add(task)
-                }
-                
+                val tasks = BackupHelper.importTasksFromJson(jsonStr)
                 if (tasks.isNotEmpty()) {
                     repository.insertTasks(tasks)
                     onComplete(true)
@@ -497,6 +509,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Import failed: ${e.message}")
+                onComplete(false)
+            }
+        }
+    }
+
+    /**
+     * Force flushes Room/SQLite WAL pages to the primary .db file.
+     */
+    fun checkpointDatabase() {
+        try {
+            val db = TaskDatabase.getDatabase(getApplication())
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Checkpoint failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Closes the active database, replaces task_database with the backup, and deletes WAL/SHM pages.
+     */
+    fun importDbBackup(inputStream: java.io.InputStream, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                TaskDatabase.closeDatabase()
+                val dbFile = getApplication<Application>().getDatabasePath("task_database")
+                val dbWalFile = getApplication<Application>().getDatabasePath("task_database-wal")
+                val dbShmFile = getApplication<Application>().getDatabasePath("task_database-shm")
+                
+                dbFile.outputStream().use { output ->
+                    inputStream.copyTo(output)
+                }
+                
+                if (dbWalFile.exists()) dbWalFile.delete()
+                if (dbShmFile.exists()) dbShmFile.delete()
+                
+                onComplete(true)
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "DB Import failed: ${e.message}", e)
                 onComplete(false)
             }
         }

@@ -18,3 +18,4 @@ local.properties
 debug.keystore
 /app/release/baselineProfiles
 /misc_files/
+/app/release/output-metadata.json

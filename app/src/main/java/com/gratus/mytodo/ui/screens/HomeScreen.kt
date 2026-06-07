@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.gratus.mytodo.ui.screens
 
 import android.app.DatePickerDialog
@@ -6,10 +7,12 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,7 +37,8 @@ import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.components.TaskAddDialog
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
-import java.text.SimpleDateFormat
+import com.gratus.mytodo.ui.utils.DateTimeUtils
+import kotlinx.coroutines.flow.Flow
 import java.util.*
 
 /**
@@ -47,12 +51,10 @@ fun HomeScreen(
     colorSchemeType: String
 ) {
     val currentDate by viewModel.currentDate.collectAsState()
-    val tasks by viewModel.homeTasks.collectAsState(initial = emptyList())
     val lastUsedPriority by viewModel.lastUsedPriority.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
-        tasks = tasks,
         lastUsedPriority = lastUsedPriority,
         colorSchemeType = colorSchemeType,
         onNavigateDate = { viewModel.navigateDate(it) },
@@ -61,7 +63,11 @@ fun HomeScreen(
         onDeleteTask = { viewModel.deleteTask(it) },
         onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
             viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
-        }
+        },
+        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis ->
+            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis)
+        },
+        getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) }
     )
 }
 
@@ -71,56 +77,61 @@ fun HomeScreen(
 @Composable
 fun HomeScreenContent(
     currentDate: Calendar,
-    tasks: List<Task>,
     lastUsedPriority: Int,
     colorSchemeType: String,
     onNavigateDate: (Int) -> Unit,
     onSetDate: (Calendar) -> Unit,
     onToggleComplete: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
-    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?) -> Unit
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?) -> Unit,
+    getTasksForDate: (String) -> Flow<List<Task>>
 ) {
     val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
+    var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
-    val dateLabelFormatter = SimpleDateFormat("EEEE, MMM dd, yyyy", Locale.getDefault())
+    // Smooth Sliding Pager setup
+    val baseDate = remember { Calendar.getInstance() }
+    val initialPage = 10000
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { 20000 })
 
-    // Simple Swipe detection to change focused date
-    val swipeModifier = Modifier.pointerInput(Unit) {
-        var dragAmountCum = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { dragAmountCum = 0f },
-            onDragEnd = {
-                if (dragAmountCum > 150f) {
-                    // Swiped light-to-right -> Go to PREVIOUS date
-                    onNavigateDate(-1)
-                } else if (dragAmountCum < -150f) {
-                    // Swiped right-to-left -> Go to NEXT date
-                    onNavigateDate(1)
-                }
-            },
-            onHorizontalDrag = { change, dragAmount ->
-                change.consume()
-                dragAmountCum += dragAmount
-            }
-        )
+    val daysDiff = remember(currentDate) {
+        DateTimeUtils.daysBetween(baseDate, currentDate)
+    }
+    val targetPage = initialPage + daysDiff
+
+    // Scroll to page when currentDate changes externally (arrows, picker)
+    LaunchedEffect(targetPage) {
+        if (pagerState.currentPage != targetPage) {
+            pagerState.animateScrollToPage(targetPage)
+        }
+    }
+
+    // Sync focus date when page changes via swipe gesture
+    LaunchedEffect(pagerState.currentPage) {
+        val diff = pagerState.currentPage - initialPage
+        val targetCal = (baseDate.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, diff)
+        }
+        if (!DateTimeUtils.isSameDay(targetCal, currentDate)) {
+            onSetDate(targetCal)
+        }
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(swipeModifier)
+        modifier = Modifier.fillMaxSize()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Screen Header Label Display
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
                         if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface 
@@ -157,7 +168,7 @@ fun HomeScreenContent(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = dateLabelFormatter.format(currentDate.time),
+                        text = DateTimeUtils.formatHomeDateLabel(currentDate),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -169,54 +180,73 @@ fun HomeScreenContent(
                 }
             }
 
-            // Tasks List
-            if (tasks.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "No tasks",
-                            modifier = Modifier
-                                .size(82.dp)
-                                .alpha(0.3f),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "No tasks recorded for today",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                        Text(
-                            text = "Swipe horizontally or tap Quick-Add to start!",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
+            // Smooth sliding horizontal pager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f)
+            ) { page ->
+                val pageDiff = page - initialPage
+                val pageDate = remember(page) {
+                    (baseDate.clone() as Calendar).apply {
+                        add(Calendar.DAY_OF_YEAR, pageDiff)
                     }
                 }
-            } else {
-                LazyColumn(
+                val dateStr = remember(pageDate) { DateTimeUtils.formatDbDate(pageDate) }
+                val pageTasks by remember(dateStr) { getTasksForDate(dateStr) }
+                    .collectAsState(initial = emptyList())
+
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .testTag("home_tasks_list"),
-                    contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        TaskItemCard(
-                            task = task,
-                            colorSchemeType = colorSchemeType,
-                            onToggleComplete = { onToggleComplete(task) },
-                            onDelete = { onDeleteTask(task) }
-                        )
+                    if (pageTasks.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "No tasks",
+                                    modifier = Modifier
+                                        .size(82.dp)
+                                        .alpha(0.3f),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "No tasks recorded for today",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    text = "Swipe horizontally or tap Quick-Add to start!",
+                                    fontSize = AppFontSizes.small,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                )
+                            }
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("home_tasks_list"),
+                            contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(pageTasks, key = { it.id }) { task ->
+                                TaskItemCard(
+                                    task = task,
+                                    colorSchemeType = colorSchemeType,
+                                    onToggleComplete = { onToggleComplete(task) },
+                                    onDelete = { taskToDelete = task },
+                                    onLongClick = { taskToEdit = task }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -230,8 +260,8 @@ fun HomeScreenContent(
                 .padding(16.dp)
                 .testTag("quick_add_fab"),
             shape = CircleShape,
-            containerColor = if (colorSchemeType == "simple") Color.Black else MaterialTheme.colorScheme.primary,
-            contentColor = if (colorSchemeType == "simple") Color.White else MaterialTheme.colorScheme.onPrimary
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         ) {
             Icon(imageVector = Icons.Default.Add, contentDescription = "Add Task")
         }
@@ -250,6 +280,47 @@ fun HomeScreenContent(
             }
         )
     }
+
+    // Task Editing Dialog Box
+    if (taskToEdit != null) {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance().apply {
+                time = DateTimeUtils.parseDbDate(taskToEdit!!.dateAdded) ?: Date()
+            },
+            lastUsedPriority = lastUsedPriority,
+            taskToEdit = taskToEdit,
+            onDismiss = { taskToEdit = null },
+            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis ->
+                onEditTask(taskToEdit!!, t, d, p, targetDate, reminderTimeMillis)
+                taskToEdit = null
+                Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Delete Task Confirmation Dialog
+    if (taskToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { taskToDelete = null },
+            title = { Text("Delete Task", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete this task?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        taskToDelete?.let { onDeleteTask(it) }
+                        taskToDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { taskToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 /**
@@ -260,7 +331,8 @@ fun TaskItemCard(
     task: Task,
     colorSchemeType: String,
     onToggleComplete: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val isCompleted = task.isCompleted
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
@@ -268,7 +340,12 @@ fun TaskItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (isCompleted) 0.55f else 1.0f) // Greys out completely when marked completed
+            .alpha(if (isCompleted) 0.8f else 1.0f) // Greys out completely when marked completed
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(
+                onClick = {}, // No action on single card tap to avoid checkmark interference
+                onLongClick = onLongClick
+            )
             .testTag("task_item_${task.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -276,7 +353,7 @@ fun TaskItemCard(
                 if (colorSchemeType == "minimal") {
                     if (isDark) Color(0x15FFFFFF) else Color(0x33B0AAB9)
                 } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 }
             } else {
                 MaterialTheme.colorScheme.surface
@@ -294,7 +371,7 @@ fun TaskItemCard(
             else -> null
         },
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (colorSchemeType == "minimal" && !isCompleted) 1.dp else 0.dp
+            defaultElevation = 0.dp
         )
     ) {
         Row(
@@ -309,27 +386,12 @@ fun TaskItemCard(
                 onClick = onToggleComplete,
                 modifier = Modifier
                     .size(28.dp)
-                    .clip(if (colorSchemeType == "minimal") RoundedCornerShape(8.dp) else CircleShape)
+                    .clip(CircleShape)
                     .background(
                         if (isCompleted) {
-                            if (colorSchemeType == "minimal") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            }
+                            MaterialTheme.colorScheme.primaryContainer
                         } else {
                             Color.Transparent
-                        }
-                    )
-                    .then(
-                        if (!isCompleted && colorSchemeType == "minimal") {
-                            Modifier.border(
-                                2.dp,
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
-                                RoundedCornerShape(8.dp)
-                            )
-                        } else {
-                            Modifier
                         }
                     )
             ) {
@@ -337,18 +399,16 @@ fun TaskItemCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Mark done status",
-                        tint = if (colorSchemeType == "minimal") Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(18.dp)
                     )
                 } else {
-                    if (colorSchemeType != "minimal") {
-                        Icon(
-                            imageVector = Icons.Default.RadioButtonUnchecked,
-                            contentDescription = "Mark done status",
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.RadioButtonUnchecked,
+                        contentDescription = "Mark done status",
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 
@@ -361,7 +421,7 @@ fun TaskItemCard(
                         textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
                     ),
                     color = if (isCompleted) {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     }
@@ -378,7 +438,6 @@ fun TaskItemCard(
 
                 // Show Scheduled Alarm timestamp indicator if active
                 if (task.reminderTime != null && task.reminderTime > System.currentTimeMillis() && !isCompleted) {
-                    val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -391,8 +450,8 @@ fun TaskItemCard(
                             modifier = Modifier.size(12.dp)
                         )
                         Text(
-                            text = "Alert scheduled: " + sdf.format(Date(task.reminderTime)),
-                            fontSize = 10.sp,
+                            text = "Alert scheduled: " + DateTimeUtils.formatAlarmTime(task.reminderTime),
+                            fontSize = AppFontSizes.micro,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -422,12 +481,12 @@ fun TaskItemCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = task.priority.toString(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = badgeStyle.contentColor
-                )
+                 Text(
+                     text = task.priority.toString(),
+                     fontWeight = FontWeight.Bold,
+                     fontSize = AppFontSizes.large,
+                     color = badgeStyle.contentColor
+                 )
             }
 
             // Delete item button inside row
@@ -479,14 +538,15 @@ fun HomeScreenMinimalPreview() {
     SoftTodoTheme(colorSchemeType = "minimal") {
         HomeScreenContent(
             currentDate = Calendar.getInstance(),
-            tasks = sampleTasks,
             lastUsedPriority = 1,
             colorSchemeType = "minimal",
             onNavigateDate = {},
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
 }
@@ -497,14 +557,15 @@ fun HomeScreenSimplePreview() {
     SoftTodoTheme(colorSchemeType = "simple") {
         HomeScreenContent(
             currentDate = Calendar.getInstance(),
-            tasks = sampleTasks,
             lastUsedPriority = 1,
             colorSchemeType = "simple",
             onNavigateDate = {},
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
 }
@@ -517,7 +578,8 @@ fun TaskItemCardPreview() {
             task = sampleTasks[0],
             colorSchemeType = "minimal",
             onToggleComplete = {},
-            onDelete = {}
+            onDelete = {},
+            onLongClick = {}
         )
     }
 }
