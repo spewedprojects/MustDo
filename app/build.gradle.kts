@@ -87,8 +87,8 @@ dependencies {
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
-  implementation(libs.androidx.appcompat)
-  implementation(libs.material)
+  //implementation(libs.androidx.appcompat) // To support AppCompatActivity. Currently, not in use.
+  //implementation(libs.material) // To support Material Components, including MDC. Currently, not in use.
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)
