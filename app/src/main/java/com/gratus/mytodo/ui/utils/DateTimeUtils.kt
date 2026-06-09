@@ -46,8 +46,32 @@ object DateTimeUtils {
     fun formatAddDialogDay(calendar: Calendar): String = addDialogDay.format(calendar.time)
     fun formatAddDialogDay(date: Date): String = addDialogDay.format(date)
     
-    fun formatAlarmTime(timeMillis: Long): String = alarmTime.format(Date(timeMillis))
-    fun formatAlarmDate(timeMillis: Long): String = alarmDate.format(Date(timeMillis))
+    fun formatAlarmTime(context: android.content.Context?, timeMillis: Long): String {
+        val is24 = try {
+            context?.let { android.text.format.DateFormat.is24HourFormat(it) } ?: false
+        } catch (e: Exception) {
+            false
+        }
+        val pattern = if (is24) "HH:mm" else "hh:mm a"
+        val sdf = SimpleDateFormat(pattern, Locale.getDefault())
+        return sdf.format(Date(timeMillis))
+    }
+
+    fun formatAlarmTime(timeMillis: Long): String = formatAlarmTime(null, timeMillis)
+
+    fun formatAlarmDate(context: android.content.Context?, timeMillis: Long): String {
+        val is24 = try {
+            context?.let { android.text.format.DateFormat.is24HourFormat(it) } ?: false
+        } catch (e: Exception) {
+            false
+        }
+        val pattern = if (is24) "MMM dd, HH:mm" else "MMM dd, hh:mm a"
+        val sdf = SimpleDateFormat(pattern, Locale.getDefault())
+        return sdf.format(Date(timeMillis))
+    }
+
+    fun formatAlarmDate(timeMillis: Long): String = formatAlarmDate(null, timeMillis)
+
     fun formatMonthYear(date: Date): String = monthYear.format(date)
 
     fun daysBetween(cal1: Calendar, cal2: Calendar): Int {

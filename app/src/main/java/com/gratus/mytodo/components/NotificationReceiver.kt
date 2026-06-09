@@ -10,6 +10,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.gratus.mytodo.MainActivity
 import com.gratus.mytodo.data.TaskDatabase
+import com.gratus.mytodo.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -24,14 +25,19 @@ class NotificationReceiver : BroadcastReceiver() {
         val taskId = intent.getIntExtra("task_id", -1)
         if (taskId == -1) return
 
+        val pendingResult = goAsync()
         // Fetch task details in background thread
         val db = TaskDatabase.getDatabase(context)
         CoroutineScope(Dispatchers.IO).launch {
-            val task = db.taskDao().getTaskById(taskId) ?: return@launch
-            
-            // Show notification if task is not completed yet
-            if (!task.isCompleted) {
-                showNotification(context, task.id, task.title, task.priority, task.description)
+            try {
+                val task = db.taskDao().getTaskById(taskId)
+                
+                // Show notification if task is not completed yet
+                if (task != null && !task.isCompleted) {
+                    showNotification(context, task.id, task.title, task.priority, task.description)
+                }
+            } finally {
+                pendingResult.finish()
             }
         }
     }
@@ -43,7 +49,7 @@ class NotificationReceiver : BroadcastReceiver() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "To-Do Task Reminders",
+                "MustDo Task Reminders",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Urgent reminder notifications for scheduled tasks."
@@ -70,7 +76,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_popup_reminder)
+            .setSmallIcon(R.drawable.icon_v3)
             .setContentTitle("Reminder: $title")
             .setContentText("$priorityText - $desc")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -5,7 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTransformGestures
+import com.gratus.mytodo.ui.utils.detectPinchZoom
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,6 +41,7 @@ import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
+import java.text.SimpleDateFormat
 import java.util.*
 
 /**
@@ -66,6 +67,7 @@ fun HistoryScreen(
         colorSchemeType = colorSchemeType,
         onQueryChange = { viewModel.setSearchQuery(it) },
         onZoomChange = { viewModel.zoomHistory(it) },
+        onZoomLevelSet = { viewModel.setHistoryZoom(it) },
         onDisplayTypeChange = { viewModel.setHistoryDisplay(it) },
         onFilterChange = { viewModel.setHistoryFilter(it) }
     )
@@ -85,6 +87,7 @@ fun HistoryScreenContent(
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
     onZoomChange: (Int) -> Unit,
+    onZoomLevelSet: (Int) -> Unit,
     onDisplayTypeChange: (DisplayType) -> Unit,
     onFilterChange: (FilterOption) -> Unit
 ) {
@@ -93,19 +96,24 @@ fun HistoryScreenContent(
     // State to throttling scale gestures
     var lastGestureTime by remember { mutableLongStateOf(0L) }
 
-    // Pinch to Zoom math utilizing pointers transform detector (bounds checked in ViewModel)
+    // Pinch to Zoom math utilizing custom cumulative pinch detector
     val pinchZoomModifier = Modifier.pointerInput(Unit) {
-        detectTransformGestures { _, _, zoom, _ ->
-            val now = System.currentTimeMillis()
-            if (now - lastGestureTime < 150) return@detectTransformGestures // Debounce rate
-            if (zoom > 1.25f) {
-                onZoomChange(1) // zoom in
-                lastGestureTime = now
-            } else if (zoom < 0.75f) {
-                onZoomChange(-1) // zoom out
-                lastGestureTime = now
+        detectPinchZoom(
+            onZoomIn = {
+                val now = System.currentTimeMillis()
+                if (now - lastGestureTime >= 150) {
+                    onZoomChange(1) // zoom in
+                    lastGestureTime = now
+                }
+            },
+            onZoomOut = {
+                val now = System.currentTimeMillis()
+                if (now - lastGestureTime >= 150) {
+                    onZoomChange(-1) // zoom out
+                    lastGestureTime = now
+                }
             }
-        }
+        )
     }
 
     Column(
@@ -295,11 +303,31 @@ fun HistoryScreenContent(
                     .testTag("history_tasks_list")
             ) { targetZoom ->
                 when (targetZoom) {
-                    0 -> YearView(tasks = tasks, colorSchemeType = colorSchemeType)
-                    1 -> MonthView(tasks = tasks, colorSchemeType = colorSchemeType)
-                    2 -> DayView(tasks = tasks, displayType = displayType, colorSchemeType = colorSchemeType)
-                    3 -> ExpandedView(tasks = tasks, colorSchemeType = colorSchemeType)
-                    else -> DayView(tasks = tasks, displayType = displayType, colorSchemeType = colorSchemeType)
+                    0 -> YearView(
+                        tasks = tasks,
+                        colorSchemeType = colorSchemeType,
+                        onQueryChange = onQueryChange,
+                        onZoomLevelSet = onZoomLevelSet
+                    )
+                    1 -> MonthView(
+                        tasks = tasks,
+                        colorSchemeType = colorSchemeType,
+                        onZoomLevelSet = onZoomLevelSet
+                    )
+                    2 -> WeekView(
+                        tasks = tasks,
+                        colorSchemeType = colorSchemeType,
+                        onQueryChange = onQueryChange,
+                        onZoomLevelSet = onZoomLevelSet
+                    )
+                    3 -> ExpandedView(
+                        tasks = tasks,
+                        colorSchemeType = colorSchemeType
+                    )
+                    else -> ExpandedView(
+                        tasks = tasks,
+                        colorSchemeType = colorSchemeType
+                    )
                 }
             }
         }
@@ -327,48 +355,31 @@ fun MainFontText(
 }
 
 /**
- * Level 0: Year View (Completed Tasks only, represented by priority blocks)
+ * Level 0: Year View (Groups tasks by Year, displaying 12-month grids)
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun YearView(
     tasks: List<Task>,
-    colorSchemeType: String
+    colorSchemeType: String,
+    onQueryChange: (String) -> Unit,
+    onZoomLevelSet: (Int) -> Unit
 ) {
-    val completedTasks = remember(tasks) { tasks.filter { it.isCompleted } }
-    
-    val groupedByYear = remember(completedTasks) {
-        completedTasks.groupBy { task ->
-            val date = DateTimeUtils.parseDbDate(task.dateAdded)
+    val groupedByYear = remember(tasks) {
+        tasks.groupBy { task ->
+            val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
             val cal = Calendar.getInstance()
-            if (date != null) cal.time = date
+            cal.time = date
             cal.get(Calendar.YEAR).toString()
         }.toSortedMap(compareByDescending { it })
     }
-    
-    var selectedTask by remember { mutableStateOf<Task?>(null) }
-    
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        if (completedTasks.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No completed tasks to display in Year View",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                )
-            }
-        } else {
-            groupedByYear.forEach { (year, yearTasks) ->
+        groupedByYear.forEach { (year, yearTasks) ->
+            item(key = year) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -390,118 +401,78 @@ fun YearView(
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
                             text = year,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        
+
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                        
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            yearTasks.forEach { task ->
-                                val containerCol = getPriorityBoxColor(task.priority, isCompleted = false)
-                                val isSelected = selectedTask?.id == task.id
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(containerCol)
-                                        .border(
-                                            width = if (isSelected) 2.dp else 0.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                                            shape = RoundedCornerShape(4.dp)
-                                        )
-                                        .clickable {
-                                            selectedTask = if (isSelected) null else task
-                                        }
-                                )
+
+                        val monthsInYear = remember(yearTasks) {
+                            yearTasks.groupBy { task ->
+                                val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                                val cal = Calendar.getInstance()
+                                cal.time = date
+                                cal.get(Calendar.MONTH)
                             }
                         }
-                    }
-                }
-            }
-        }
-        
-        // Drawer-like task details at the bottom of the scroll view
-        selectedTask?.let { task ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Task Details",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        IconButton(
-                            onClick = { selectedTask = null },
-                            modifier = Modifier.size(24.dp)
+
+                        val monthsAbbr = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+                        
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close details",
-                                modifier = Modifier.size(16.dp)
-                            )
+                            for (rowIndex in 0 until 4) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    for (colIndex in 0..2) {
+                                        val monthIndex = rowIndex * 3 + colIndex
+                                        val monthLabel = monthsAbbr[monthIndex]
+                                        val monthTasks = monthsInYear[monthIndex] ?: emptyList()
+                                        val total = monthTasks.size
+                                        val done = monthTasks.count { it.isCompleted }
+                                        val monthDbStr = String.format(Locale.US, "%s-%02d", year, monthIndex + 1)
+
+                                        Card(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable {
+                                                    onQueryChange(monthDbStr)
+                                                    onZoomLevelSet(1)
+                                                },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                            )
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(10.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = monthLabel,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = AppFontSizes.medium,
+                                                    color = MaterialTheme.colorScheme.secondary
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "$done/$total",
+                                                    fontSize = AppFontSizes.extraSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
-                    
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                    
-                    Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
-                    if (task.description.isNotBlank()) {
-                        Text(
-                            text = parseStyledDescription(task.description),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Priority: ${task.priority}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Date: ${task.dateAdded}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -510,25 +481,26 @@ fun YearView(
 }
 
 /**
- * Level 1: Month View (Groups tasks by Month, showing medium text snippets)
+ * Level 1: Month View (Groups tasks by Month, displaying weeks within the month)
  */
 @Composable
 fun MonthView(
     tasks: List<Task>,
-    colorSchemeType: String
+    colorSchemeType: String,
+    onZoomLevelSet: (Int) -> Unit
 ) {
     val groupedByMonth = remember(tasks) {
         tasks.groupBy { task ->
-            val date = DateTimeUtils.parseDbDate(task.dateAdded)
+            val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
             val cal = Calendar.getInstance()
-            if (date != null) cal.time = date
+            cal.time = date
             DateTimeUtils.formatMonthYear(cal.time)
         }
     }
-    
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
         groupedByMonth.forEach { (monthStr, monthTasks) ->
@@ -554,18 +526,86 @@ fun MonthView(
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
                             text = monthStr,
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        
+
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-                        
-                        monthTasks.forEach { task ->
-                            MediumTaskRow(task = task, colorSchemeType = colorSchemeType)
+
+                        val weeksInMonth = remember(monthTasks) {
+                            monthTasks.groupBy { task ->
+                                val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                                val cal = Calendar.getInstance()
+                                cal.time = date
+                                val firstDayOfWeek = cal.firstDayOfWeek
+                                while (cal.get(Calendar.DAY_OF_WEEK) != firstDayOfWeek) {
+                                    cal.add(Calendar.DAY_OF_MONTH, -1)
+                                }
+                                DateTimeUtils.formatDbDate(cal)
+                            }.toSortedMap()
+                        }
+
+                        val weekList = weeksInMonth.keys.toList()
+                        val rowsCount = (weekList.size + 1) / 2
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (rowIndex in 0 until rowsCount) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    for (colIndex in 0..1) {
+                                        val index = rowIndex * 2 + colIndex
+                                        if (index < weekList.size) {
+                                            val weekStartStr = weekList[index]
+                                            val weekTasks = weeksInMonth[weekStartStr] ?: emptyList()
+                                            val total = weekTasks.size
+                                            val done = weekTasks.count { it.isCompleted }
+                                            val weekDate = DateTimeUtils.parseDbDate(weekStartStr) ?: Date()
+                                            val weekLabel = SimpleDateFormat("MMM dd", Locale.getDefault()).format(weekDate)
+
+                                            Card(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        onZoomLevelSet(2)
+                                                    },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(10.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.Center
+                                                ) {
+                                                    Text(
+                                                        text = "Week of $weekLabel",
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = AppFontSizes.extraSmall,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text(
+                                                        text = "$done/$total tasks",
+                                                        fontSize = AppFontSizes.micro,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -574,75 +614,44 @@ fun MonthView(
     }
 }
 
-@Composable
-fun MediumTaskRow(task: Task, colorSchemeType: String) {
-    val isCompleted = task.isCompleted
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(12.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isCompleted) MaterialTheme.colorScheme.primaryContainer 
-                    else Color.Transparent
-                )
-                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-        )
-        
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = task.title,
-                fontWeight = FontWeight.Bold,
-                fontSize = AppFontSizes.medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-                textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
-            )
-            
-            if (task.description.isNotBlank()) {
-                Text(
-                    text = task.description,
-                    fontSize = AppFontSizes.extraSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
-}
-
 /**
- * Level 2: Day View (Default - Groups tasks by exact date, standard detailed items)
+ * Level 2: Week View (Groups tasks by Week, displaying day-wise 2-column grids)
  */
 @Composable
-fun DayView(
+fun WeekView(
     tasks: List<Task>,
-    displayType: DisplayType,
-    colorSchemeType: String
+    colorSchemeType: String,
+    onQueryChange: (String) -> Unit,
+    onZoomLevelSet: (Int) -> Unit
 ) {
+    val groupedByWeek = remember(tasks) {
+        tasks.groupBy { task ->
+            val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+            val cal = Calendar.getInstance()
+            cal.time = date
+            val firstDayOfWeek = cal.firstDayOfWeek
+            while (cal.get(Calendar.DAY_OF_WEEK) != firstDayOfWeek) {
+                cal.add(Calendar.DAY_OF_MONTH, -1)
+            }
+            DateTimeUtils.formatDbDate(cal)
+        }.toSortedMap(compareByDescending { it })
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        if (displayType == DisplayType.GROUPED) {
-            val grouped = tasks.groupBy { it.dateAdded }
-            items(grouped.keys.toList().sortedDescending()) { dateStr ->
-                val dateObj = DateTimeUtils.parseDbDate(dateStr) ?: Date()
-                val groupTasks = grouped[dateStr] ?: emptyList()
+        groupedByWeek.forEach { (weekStartStr, weekTasks) ->
+            item(key = weekStartStr) {
+                val total = weekTasks.size
+                val done = weekTasks.count { it.isCompleted }
+                val weekDate = DateTimeUtils.parseDbDate(weekStartStr) ?: Date()
+                val weekLabel = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(weekDate)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = when (colorSchemeType) {
                             "simple" -> MaterialTheme.colorScheme.surface
@@ -657,21 +666,20 @@ fun DayView(
                             androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
                         }
                         else -> null
-                    },
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    }
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = DateTimeUtils.formatHistoryGroup(dateObj),
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                text = "Week of $weekLabel",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Box(
@@ -681,8 +689,8 @@ fun DayView(
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "${groupTasks.size} tasks",
-                                    fontSize = AppFontSizes.nano,
+                                    text = "$done/$total Done",
+                                    fontSize = AppFontSizes.extraSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
@@ -691,15 +699,79 @@ fun DayView(
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
-                        groupTasks.forEach { task ->
-                            ZoomableTaskRow(task, zoomLevel = 2, colorSchemeType = colorSchemeType)
+                        val daysInWeek = remember(weekTasks) {
+                            weekTasks.groupBy { it.dateAdded }.toSortedMap()
+                        }
+                        val dayList = daysInWeek.keys.toList()
+                        val rowsCount = (dayList.size + 1) / 2
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (rowIndex in 0 until rowsCount) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    for (colIndex in 0..1) {
+                                        val index = rowIndex * 2 + colIndex
+                                        if (index < dayList.size) {
+                                            val dayStr = dayList[index]
+                                            val dayTasks = daysInWeek[dayStr] ?: emptyList()
+                                            val dayDate = DateTimeUtils.parseDbDate(dayStr) ?: Date()
+                                            val dayLabelStr = SimpleDateFormat("EEE, MMM dd", Locale.getDefault()).format(dayDate)
+
+                                            Card(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        onQueryChange(dayStr)
+                                                        onZoomLevelSet(3)
+                                                    },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = dayLabelStr,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = AppFontSizes.extraSmall,
+                                                        color = MaterialTheme.colorScheme.secondary
+                                                    )
+                                                    dayTasks.take(3).forEach { task ->
+                                                        Text(
+                                                            text = task.title,
+                                                            fontSize = AppFontSizes.micro,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    if (dayTasks.size > 3) {
+                                                        Text(
+                                                            text = "+${dayTasks.size - 3} more",
+                                                            fontSize = AppFontSizes.nano,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-            }
-        } else {
-            items(tasks) { task ->
-                ZoomableTaskRow(task, zoomLevel = 2, colorSchemeType = colorSchemeType)
             }
         }
     }
@@ -770,6 +842,7 @@ fun ExpandedView(
 fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
     val isCompleted = task.isCompleted
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val context = LocalContext.current
     
     Card(
         modifier = Modifier
@@ -901,7 +974,7 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
-                                text = DateTimeUtils.formatAlarmTime(task.reminderTime),
+                                text = DateTimeUtils.formatAlarmTime(context, task.reminderTime),
                                 fontSize = AppFontSizes.extraSmall,
                                 color = MaterialTheme.colorScheme.secondary,
                                 fontWeight = FontWeight.SemiBold
@@ -1104,16 +1177,17 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
 @Preview(showBackground = true, name = "History Screen - Colorful Theme")
 @Composable
 fun HistoryScreenPreview() {
-    SoftTodoTheme(colorSchemeType = "colorful") {
+    SoftTodoTheme(colorSchemeType = "simple") {
         HistoryScreenContent(
             tasks = sampleHistoryTasks,
             query = "",
-            zoomLevel = 2,
+            zoomLevel = 3,
             displayType = DisplayType.GROUPED,
             activeFilter = FilterOption.ALL,
-            colorSchemeType = "colorful",
+            colorSchemeType = "simple",
             onQueryChange = {},
             onZoomChange = {},
+            onZoomLevelSet = {},
             onDisplayTypeChange = {},
             onFilterChange = {}
         )
@@ -1127,7 +1201,7 @@ fun ZoomableTaskRowPreview() {
         ZoomableTaskRow(
             task = sampleHistoryTasks[0],
             zoomLevel = 3,
-            colorSchemeType = "minimal"
+            colorSchemeType = "simple"
         )
     }
 }

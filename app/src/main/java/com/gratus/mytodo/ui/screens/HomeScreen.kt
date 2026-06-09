@@ -53,10 +53,20 @@ fun HomeScreen(
     val currentDate by viewModel.currentDate.collectAsState()
     val lastUsedPriority by viewModel.lastUsedPriority.collectAsState()
 
+    val showAddDialog by viewModel.showAddDialog.collectAsState()
+    val taskToEdit by viewModel.taskToEdit.collectAsState()
+    val taskToDelete by viewModel.taskToDelete.collectAsState()
+
     HomeScreenContent(
         currentDate = currentDate,
         lastUsedPriority = lastUsedPriority,
         colorSchemeType = colorSchemeType,
+        showAddDialog = showAddDialog,
+        taskToEdit = taskToEdit,
+        taskToDelete = taskToDelete,
+        onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
+        onTaskToEditChange = { viewModel.setTaskToEdit(it) },
+        onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
         onNavigateDate = { viewModel.navigateDate(it) },
         onSetDate = { viewModel.setDate(it) },
         onToggleComplete = { viewModel.toggleCompleted(it) },
@@ -79,6 +89,12 @@ fun HomeScreenContent(
     currentDate: Calendar,
     lastUsedPriority: Int,
     colorSchemeType: String,
+    showAddDialog: Boolean,
+    taskToEdit: Task?,
+    taskToDelete: Task?,
+    onShowAddDialogChange: (Boolean) -> Unit,
+    onTaskToEditChange: (Task?) -> Unit,
+    onTaskToDeleteChange: (Task?) -> Unit,
     onNavigateDate: (Int) -> Unit,
     onSetDate: (Calendar) -> Unit,
     onToggleComplete: (Task) -> Unit,
@@ -88,9 +104,6 @@ fun HomeScreenContent(
     getTasksForDate: (String) -> Flow<List<Task>>
 ) {
     val context = LocalContext.current
-    var showAddDialog by remember { mutableStateOf(false) }
-    var taskToDelete by remember { mutableStateOf<Task?>(null) }
-    var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
     // Smooth Sliding Pager setup
     val baseDate = remember { Calendar.getInstance() }
@@ -238,13 +251,13 @@ fun HomeScreenContent(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(pageTasks, key = { it.id }) { task ->
-                                TaskItemCard(
-                                    task = task,
-                                    colorSchemeType = colorSchemeType,
-                                    onToggleComplete = { onToggleComplete(task) },
-                                    onDelete = { taskToDelete = task },
-                                    onLongClick = { taskToEdit = task }
-                                )
+                                 TaskItemCard(
+                                     task = task,
+                                     colorSchemeType = colorSchemeType,
+                                     onToggleComplete = { onToggleComplete(task) },
+                                     onDelete = { onTaskToDeleteChange(task) },
+                                     onLongClick = { onTaskToEditChange(task) }
+                                 )
                             }
                         }
                     }
@@ -254,7 +267,7 @@ fun HomeScreenContent(
 
         // Quick Add Floating Button
         FloatingActionButton(
-            onClick = { showAddDialog = true },
+            onClick = { onShowAddDialogChange(true) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp)
@@ -272,10 +285,10 @@ fun HomeScreenContent(
         TaskAddDialog(
             initialDate = currentDate,
             lastUsedPriority = lastUsedPriority,
-            onDismiss = { showAddDialog = false },
+            onDismiss = { onShowAddDialogChange(false) },
             onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
                 onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
-                showAddDialog = false
+                onShowAddDialogChange(false)
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
             }
         )
@@ -285,14 +298,14 @@ fun HomeScreenContent(
     if (taskToEdit != null) {
         TaskAddDialog(
             initialDate = Calendar.getInstance().apply {
-                time = DateTimeUtils.parseDbDate(taskToEdit!!.dateAdded) ?: Date()
+                time = DateTimeUtils.parseDbDate(taskToEdit.dateAdded) ?: Date()
             },
             lastUsedPriority = lastUsedPriority,
             taskToEdit = taskToEdit,
-            onDismiss = { taskToEdit = null },
+            onDismiss = { onTaskToEditChange(null) },
             onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis ->
-                onEditTask(taskToEdit!!, t, d, p, targetDate, reminderTimeMillis)
-                taskToEdit = null
+                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis)
+                onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
             }
         )
@@ -300,23 +313,35 @@ fun HomeScreenContent(
 
     // Delete Task Confirmation Dialog
     if (taskToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { taskToDelete = null },
-            title = { Text("Delete Task", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to delete this task?") },
+         AlertDialog(
+            onDismissRequest = { onTaskToDeleteChange(null) },
+            modifier = Modifier.border(
+                width = 1.dp,
+                color = if (colorSchemeType == "simple") {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                } else if (colorSchemeType == "minimal") {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                } else {
+                    Color.Transparent
+                },
+                shape = RoundedCornerShape(28.dp)
+            ),
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = { Text("Delete Task", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Are you sure you want to delete this task?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         taskToDelete?.let { onDeleteTask(it) }
-                        taskToDelete = null
+                        onTaskToDeleteChange(null)
                     }
                 ) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { taskToDelete = null }) {
-                    Text("Cancel")
+                TextButton(onClick = { onTaskToDeleteChange(null) }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )
@@ -336,6 +361,7 @@ fun TaskItemCard(
 ) {
     val isCompleted = task.isCompleted
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val context = LocalContext.current
 
     Card(
         modifier = Modifier
@@ -436,8 +462,8 @@ fun TaskItemCard(
                     )
                 }
 
-                // Show Scheduled Alarm timestamp indicator if active
-                if (task.reminderTime != null && task.reminderTime > System.currentTimeMillis() && !isCompleted) {
+                // Show Scheduled Alarm timestamp indicator
+                if (task.reminderTime != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -446,13 +472,13 @@ fun TaskItemCard(
                         Icon(
                             imageVector = Icons.Default.Notifications,
                             contentDescription = "Active reminder",
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(12.dp)
                         )
-                        Text(
-                            text = "Alert scheduled: " + DateTimeUtils.formatAlarmTime(task.reminderTime),
+                         Text(
+                            text = "Alert scheduled: " + DateTimeUtils.formatAlarmTime(context, task.reminderTime),
                             fontSize = AppFontSizes.micro,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -540,6 +566,12 @@ fun HomeScreenMinimalPreview() {
             currentDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             colorSchemeType = "minimal",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = null,
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
             onNavigateDate = {},
             onSetDate = {},
             onToggleComplete = {},
@@ -559,6 +591,12 @@ fun HomeScreenSimplePreview() {
             currentDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             colorSchemeType = "simple",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = null,
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
             onNavigateDate = {},
             onSetDate = {},
             onToggleComplete = {},

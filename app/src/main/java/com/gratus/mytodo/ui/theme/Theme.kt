@@ -127,7 +127,6 @@ fun SoftTodoTheme(
                     background = ColorfulDarkBg,
                     onBackground = ColorfulDarkOnBg,
                     surface = ColorfulDarkCard,
-                    surfaceVariant = ColorfulDarkCard2,
                     onSurface = ColorfulDarkOnBg,
                     outline = ColorfulDarkOnBg.copy(alpha = 0.2f)
                 )
@@ -140,7 +139,6 @@ fun SoftTodoTheme(
                     background = ColorfulLightBg,
                     onBackground = ColorfulLightOnBg,
                     surface = ColorfulLightCard,
-                    surfaceVariant = ColorfulLightCard2,
                     onSurface = ColorfulLightOnBg,
                     outline = ColorfulLightOnBg.copy(alpha = 0.1f)
                 )

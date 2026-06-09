@@ -14,7 +14,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks ORDER BY dateAdded DESC, createdSeq ASC")
     fun getAllTasksFlow(): Flow<List<Task>>
 
-    @Query("SELECT * FROM tasks WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' ORDER BY dateAdded DESC")
+    @Query("SELECT * FROM tasks WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' OR dateAdded LIKE '%' || :query || '%' ORDER BY dateAdded DESC")
     fun searchTasksFlow(query: String): Flow<List<Task>>
 
     @Query("SELECT * FROM tasks WHERE id = :id")

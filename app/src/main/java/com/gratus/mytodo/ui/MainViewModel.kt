@@ -88,11 +88,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _lastUsedPriority = MutableStateFlow(sharedPrefs.getInt("last_priority", 1))
     val lastUsedPriority: StateFlow<Int> = _lastUsedPriority.asStateFlow()
 
+    // Dialog / Edit Screen States (preserved across screen rotations)
+    private val _showAddDialog = MutableStateFlow(false)
+    val showAddDialog: StateFlow<Boolean> = _showAddDialog.asStateFlow()
+
+    private val _taskToEdit = MutableStateFlow<Task?>(null)
+    val taskToEdit: StateFlow<Task?> = _taskToEdit.asStateFlow()
+
+    private val _taskToDelete = MutableStateFlow<Task?>(null)
+    val taskToDelete: StateFlow<Task?> = _taskToDelete.asStateFlow()
+
+    fun setShowAddDialog(show: Boolean) {
+        _showAddDialog.value = show
+    }
+
+    fun setTaskToEdit(task: Task?) {
+        _taskToEdit.value = task
+    }
+
+    fun setTaskToDelete(task: Task?) {
+        _taskToDelete.value = task
+    }
+
     // Historical screen states
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _historyZoomLevel = MutableStateFlow(2) // 0 (Year), 1 (Month), 2 (Day), 3 (Expanded)
+    private val _historyZoomLevel = MutableStateFlow(3) // 0 (Year), 1 (Month), 2 (Week), 3 (Regular)
     val historyZoomLevel: StateFlow<Int> = _historyZoomLevel.asStateFlow()
 
     private val _historyDisplayType = MutableStateFlow(DisplayType.LIST)
@@ -179,16 +201,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         
         baseFlow.map { list ->
             val todayStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
-            list.filter { task ->
-                when (filter) {
-                    FilterOption.ALL -> true
-                    FilterOption.MARKED_COMPLETE -> task.isCompleted
-                    FilterOption.LEFT_INCOMPLETE -> {
-                        // Left incomplete: in the past and isCompleted is false
-                        !task.isCompleted && task.dateAdded < todayStr
+            val trimmedQuery = query.trim()
+            val isDateQuery = trimmedQuery.matches(Regex("\\d{4}-\\d{2}(-\\d{2})?"))
+            list.filter { it.dateAdded <= todayStr || (isDateQuery && it.dateAdded.startsWith(trimmedQuery)) }
+                .filter { task ->
+                    when (filter) {
+                        FilterOption.ALL -> true
+                        FilterOption.MARKED_COMPLETE -> task.isCompleted
+                        FilterOption.LEFT_INCOMPLETE -> {
+                            // Left incomplete: in the past and isCompleted is false
+                            !task.isCompleted && task.dateAdded < todayStr
+                        }
                     }
                 }
-            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -411,8 +436,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     val statsFlow: Flow<StatsData> = repository.getAllTasks()
         .map { allTasks ->
-            val total = allTasks.size
-            val completed = allTasks.count { it.isCompleted }
+            val todayStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
+            val tasksUntilToday = allTasks.filter { it.dateAdded <= todayStr }
+            val total = tasksUntilToday.size
+            val completed = tasksUntilToday.count { it.isCompleted }
             val completionRate = if (total > 0) (completed.toFloat() / total * 100).toInt() else 0
 
             // Consistency calculation (Consecutive days with at least one completed task)

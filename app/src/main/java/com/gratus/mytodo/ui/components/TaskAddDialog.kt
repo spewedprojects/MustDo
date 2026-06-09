@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,20 +68,22 @@ fun TaskAddDialog(
 ) {
     val context = LocalContext.current
 
-    var title by remember { mutableStateOf(taskToEdit?.title ?: "") }
+    var title by rememberSaveable { mutableStateOf(taskToEdit?.title ?: "") }
     // Description text state holds TextFieldValue for selection range tracking & formatting injection.
-    var descriptionValue by remember { mutableStateOf(TextFieldValue(taskToEdit?.description ?: "")) }
+    var descriptionValue by rememberSaveable(stateSaver = TextFieldValue.Saver) { 
+        mutableStateOf(TextFieldValue(taskToEdit?.description ?: "")) 
+    }
     
     // Priority state defaults to last used priority
-    var priority by remember { mutableStateOf(taskToEdit?.priority ?: lastUsedPriority.coerceIn(1, 4)) }
+    var priority by rememberSaveable { mutableStateOf(taskToEdit?.priority ?: lastUsedPriority.coerceIn(1, 4)) }
 
     // Alarm reminder state (timestamp milliseconds)
-    var reminderTimestamp by remember { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
+    var reminderTimestamp by rememberSaveable { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
 
     // Recurrence selection
-    var everydayCount by remember { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
-    val replicationDates = remember { mutableStateListOf<String>() }
-    var showRangePickerDialog by remember { mutableStateOf(false) }
+    var everydayCount by rememberSaveable { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
+    var replicationDates by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var showRangePickerDialog by rememberSaveable { mutableStateOf(false) }
 
     // Calendar instances for rendering next 7 days clone option
     val nextDays = remember {
@@ -103,7 +108,7 @@ fun TaskAddDialog(
                 .testTag("task_add_dialog_card"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Elevation doesn't behave as intended when combined with a transparent bg.
@@ -129,6 +134,14 @@ fun TaskAddDialog(
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close Dialog")
                     }
                 }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
 
                 // Title Input
                 OutlinedTextField(
@@ -339,7 +352,7 @@ fun TaskAddDialog(
                         )
                         Text(
                             text = if (reminderTimestamp != null) {
-                                "Trigger on: " + DateTimeUtils.formatAlarmDate(reminderTimestamp!!)
+                                "Trigger on: " + DateTimeUtils.formatAlarmDate(context, reminderTimestamp!!)
                             } else {
                                 "Set an alert for this task"
                             },
@@ -364,38 +377,38 @@ fun TaskAddDialog(
                         
                         Button(
                             onClick = {
+                                val pickedCal = Calendar.getInstance().apply {
+                                    time = initialDate.time
+                                }
                                 val currentCal = Calendar.getInstance()
-                                DatePickerDialog(
+                                val defaultHour = if (reminderTimestamp != null) {
+                                    Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.HOUR_OF_DAY)
+                                } else {
+                                    currentCal.get(Calendar.HOUR_OF_DAY)
+                                }
+                                val defaultMinute = if (reminderTimestamp != null) {
+                                    Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.MINUTE)
+                                } else {
+                                    currentCal.get(Calendar.MINUTE)
+                                }
+
+                                TimePickerDialog(
                                     context,
-                                    { _, year, month, dayOfMonth ->
-                                        val pickedCal = Calendar.getInstance().apply {
-                                            set(Calendar.YEAR, year)
-                                            set(Calendar.MONTH, month)
-                                            set(Calendar.DAY_OF_MONTH, dayOfMonth)
-                                        }
+                                    { _, hourOfDay, minute ->
+                                        pickedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                        pickedCal.set(Calendar.MINUTE, minute)
+                                        pickedCal.set(Calendar.SECOND, 0)
+                                        pickedCal.set(Calendar.MILLISECOND, 0)
                                         
-                                        TimePickerDialog(
-                                            context,
-                                            { _, hourOfDay, minute ->
-                                                pickedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                                                pickedCal.set(Calendar.MINUTE, minute)
-                                                pickedCal.set(Calendar.SECOND, 0)
-                                                pickedCal.set(Calendar.MILLISECOND, 0)
-                                                
-                                                if (pickedCal.timeInMillis > System.currentTimeMillis()) {
-                                                    reminderTimestamp = pickedCal.timeInMillis
-                                                } else {
-                                                    Toast.makeText(context, "Reminder must be set in the future!", Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
-                                            currentCal.get(Calendar.HOUR_OF_DAY),
-                                            currentCal.get(Calendar.MINUTE),
-                                            false
-                                        ).show()
+                                        if (pickedCal.timeInMillis > System.currentTimeMillis()) {
+                                            reminderTimestamp = pickedCal.timeInMillis
+                                        } else {
+                                            Toast.makeText(context, "Reminder must be set in the future!", Toast.LENGTH_SHORT).show()
+                                        }
                                     },
-                                    currentCal.get(Calendar.YEAR),
-                                    currentCal.get(Calendar.MONTH),
-                                    currentCal.get(Calendar.DAY_OF_MONTH)
+                                    defaultHour,
+                                    defaultMinute,
+                                    android.text.format.DateFormat.is24HourFormat(context)
                                 ).show()
                             },
                             colors = ButtonDefaults.buttonColors(
@@ -496,10 +509,10 @@ fun TaskAddDialog(
                                             RoundedCornerShape(12.dp)
                                         )
                                         .clickable {
-                                            if (isSelected) {
-                                                replicationDates.remove(dbStr)
+                                            replicationDates = if (isSelected) {
+                                                replicationDates - dbStr
                                             } else {
-                                                replicationDates.add(dbStr)
+                                                replicationDates + dbStr
                                             }
                                         }
                                         .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -561,6 +574,8 @@ fun TaskAddDialog(
                     }
                 }
 
+                } // End of scrollable Column
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Footer Actions
@@ -620,13 +635,11 @@ fun TaskAddDialog(
                                 dates.add(DateTimeUtils.formatDbDate(cursor))
                                 cursor.add(Calendar.DAY_OF_YEAR, 1)
                             }
-                            replicationDates.clear()
-                            replicationDates.addAll(dates)
-                        } else if (startMillis != null) {
-                            val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
-                            replicationDates.clear()
-                            replicationDates.add(DateTimeUtils.formatDbDate(startCal))
-                        }
+                            replicationDates = dates
+                         } else if (startMillis != null) {
+                             val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
+                             replicationDates = listOf(DateTimeUtils.formatDbDate(startCal))
+                         }
                         showRangePickerDialog = false
                     }
                 ) {
@@ -651,7 +664,7 @@ fun TaskAddDialog(
 @Preview(showBackground = true)
 @Composable
 fun TaskAddDialogPreview() {
-    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "light") {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
         TaskAddDialog(
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,

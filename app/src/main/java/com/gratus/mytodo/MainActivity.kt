@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -72,6 +74,33 @@ class MainActivity : ComponentActivity() {
             val activeTheme by viewModel.settingsTheme.collectAsState()
             val colorSchemeType by viewModel.settingsColorScheme.collectAsState()
 
+            val isDark = when (activeTheme) {
+                "light" -> false
+                "dark" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+
+            LaunchedEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    },
+                    navigationBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    }
+                )
+            }
+
             SoftTodoTheme(
                 themeMode = activeTheme,
                 colorSchemeType = colorSchemeType
@@ -93,23 +122,59 @@ class MainActivity : ComponentActivity() {
 /**
  * MainLayout containing Drawer, Persistent Header, and the Dynamic body.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainLayout(
     viewModel: MainViewModel,
     colorSchemeType: String
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val context = LocalContext.current
-
     val activeScreen by viewModel.activeScreen.collectAsState()
     val focusDate by viewModel.currentDate.collectAsState()
     val sortOption by viewModel.sortingOption.collectAsState()
 
+    MainLayoutContent(
+        activeScreen = activeScreen,
+        focusDate = focusDate,
+        sortOption = sortOption,
+        colorSchemeType = colorSchemeType,
+        onSetActiveScreen = { viewModel.setActiveScreen(it) },
+        onNavigateDate = { viewModel.navigateDate(it) },
+        onToggleSorting = {
+            viewModel.toggleSorting()
+            val label = if (sortOption == SortOption.PRIORITY) "Sequence chronological" else "Priority list levels"
+            Toast.makeText(viewModel.getApplication(), "Sorted by $label", Toast.LENGTH_SHORT).show()
+        },
+        screenContent = { onOpenDrawer ->
+            when (activeScreen) {
+                Screen.HOME -> HomeScreen(viewModel, onOpenDrawer, colorSchemeType)
+                Screen.HISTORY -> HistoryScreen(viewModel, colorSchemeType)
+                Screen.STATS -> StatsScreen(viewModel, colorSchemeType)
+                Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
+            }
+        }
+    )
+}
+
+/**
+ * Stateless version of MainLayout for preview and testing.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainLayoutContent(
+    activeScreen: Screen,
+    focusDate: Calendar,
+    sortOption: SortOption,
+    colorSchemeType: String,
+    onSetActiveScreen: (Screen) -> Unit,
+    onNavigateDate: (Int) -> Unit,
+    onToggleSorting: () -> Unit,
+    screenContent: @Composable (onOpenDrawer: () -> Unit) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
     if (activeScreen != Screen.HOME) {
         androidx.activity.compose.BackHandler {
-            viewModel.setActiveScreen(Screen.HOME)
+            onSetActiveScreen(Screen.HOME)
         }
     }
 
@@ -172,7 +237,7 @@ fun MainLayout(
                         label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
                         selected = isSelected,
                         onClick = {
-                            viewModel.setActiveScreen(screenKey)
+                            onSetActiveScreen(screenKey)
                             coroutineScope.launch { drawerState.close() }
                         },
                         modifier = Modifier
@@ -221,7 +286,7 @@ fun MainLayout(
                                 ) {
                                     // Faint Left Date Increment
                                     IconButton(
-                                        onClick = { viewModel.navigateDate(-1) },
+                                        onClick = { onNavigateDate(-1) },
                                         modifier = Modifier.alpha(0.6f)
                                     ) {
                                         Icon(
@@ -231,15 +296,20 @@ fun MainLayout(
                                         )
                                     }
                                     
+                                    val headerText = if (DateTimeUtils.isSameDay(focusDate, java.util.Calendar.getInstance())) {
+                                        "Today"
+                                    } else {
+                                        DateTimeUtils.formatMainHeader(focusDate)
+                                    }
                                     Text(
-                                        text = DateTimeUtils.formatMainHeader(focusDate),
+                                        text = headerText,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
 
                                     // Faint Right Date Increment
                                     IconButton(
-                                        onClick = { viewModel.navigateDate(1) },
+                                        onClick = { onNavigateDate(1) },
                                         modifier = Modifier.alpha(0.6f)
                                     ) {
                                         Icon(
@@ -281,11 +351,7 @@ fun MainLayout(
                             if (activeScreen == Screen.HOME) {
                                 // Sorting trigger button (Priority order vs Chronological Addition Sequence)
                                 IconButton(
-                                    onClick = { 
-                                        viewModel.toggleSorting()
-                                        val label = if (sortOption == SortOption.PRIORITY) "Sequence chronological" else "Priority list levels"
-                                        Toast.makeText(viewModel.getApplication(), "Sorted by $label", Toast.LENGTH_SHORT).show()
-                                    },
+                                    onClick = onToggleSorting,
                                     modifier = Modifier.testTag("sort_tasks_button")
                                 ) {
                                     Icon(
@@ -313,14 +379,30 @@ fun MainLayout(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    when (activeScreen) {
-                        Screen.HOME -> HomeScreen(viewModel, { coroutineScope.launch { drawerState.open() } }, colorSchemeType)
-                        Screen.HISTORY -> HistoryScreen(viewModel, colorSchemeType)
-                        Screen.STATS -> StatsScreen(viewModel, colorSchemeType)
-                        Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
-                    }
+                    screenContent { coroutineScope.launch { drawerState.open() } }
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun MainLayoutPreview() {
+    SoftTodoTheme {
+        MainLayoutContent(
+            activeScreen = Screen.HOME,
+            focusDate = Calendar.getInstance(),
+            sortOption = SortOption.PRIORITY,
+            colorSchemeType = "minimal",
+            onSetActiveScreen = {},
+            onNavigateDate = {},
+            onToggleSorting = {},
+            screenContent = {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Main Layout Preview Content")
+                }
+            }
+        )
     }
 }
