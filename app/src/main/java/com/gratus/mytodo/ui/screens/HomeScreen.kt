@@ -165,7 +165,7 @@ fun HomeScreenContent(
                         imageVector = Icons.Default.DateRange,
                         contentDescription = "Pick a Date",
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Text(
                         text = DateTimeUtils.formatHomeDateLabel(currentDate),
@@ -413,7 +413,7 @@ fun TaskItemCard(
             }
 
             // Title & Description (Markdown parsed dynamically)
-            Column(modifier = Modifier.weight(1f)) {
+            Column(modifier = Modifier.weight(1f).padding(start = 6.dp)) {
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
@@ -532,7 +532,7 @@ fun getPriorityBoxColor(priority: Int, isCompleted: Boolean): Color {
     }
 }
 
-@Preview(showBackground = true, name = "HomeScreen - Minimal Theme")
+@Preview(showBackground = true, name = "HomeScreen - Minimal Theme", showSystemUi = true)
 @Composable
 fun HomeScreenMinimalPreview() {
     SoftTodoTheme(colorSchemeType = "minimal") {
@@ -573,10 +573,10 @@ fun HomeScreenSimplePreview() {
 @Preview(showBackground = true, name = "Task Item Card")
 @Composable
 fun TaskItemCardPreview() {
-    SoftTodoTheme {
+    SoftTodoTheme(colorSchemeType = "colorful") {
         TaskItemCard(
             task = sampleTasks[0],
-            colorSchemeType = "minimal",
+            colorSchemeType = "colorful",
             onToggleComplete = {},
             onDelete = {},
             onLongClick = {}

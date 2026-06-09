@@ -103,10 +103,10 @@ fun TaskAddDialog(
                 .testTag("task_add_dialog_card"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Elevation doesn't behave as intended when combined with a transparent bg.
         ) {
             Column(
                 modifier = Modifier
@@ -651,7 +651,7 @@ fun TaskAddDialog(
 @Preview(showBackground = true)
 @Composable
 fun TaskAddDialogPreview() {
-    SoftTodoTheme {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "light") {
         TaskAddDialog(
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,

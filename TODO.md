@@ -44,4 +44,22 @@
         - Smoothly transition or cross-fade between these 4 layout states when thresholds are crossed. - (DONE)
         - Map my historical task array dynamically based on the active state. - (DONE)
 
-### 7. 
+All the above tasks were marked done on 07/06/2026
+*********
+
+Next TODO:
+### 1. Zoom pinch doesn't work.
+
+### 2. Task dialog:
+  - The range picker need to be changed and replaced with modern one. (But the issue is ComponentAvtivity vs AppCompatActivity, due to MDC).
+  - Setting reminder should jump straight to time picker and not date first then time.
+
+### 3. Overall app:
+  - At every instance of time/date/range picker in the app, should follow the system default when it comes to 12hr clock or 24hr clock and the first day of week for date/range pickers.
+  - Notification system isn't working as intended; when the time of notifying arrives, there are no notifications sent out by th app.
+  - When system is in light mode - systembar icons are in dark, and the app is in dark mode (set manually) - the systembar icons remain dark, they should compliment the theme mode of the app.
+
+### 4. History screen and stats screen:
+  - Disable future dates tasks history screen.
+  - 
+  - Total Count of tasks-$y (in Completion rate card "$x of $y Done") should only show until today's date in Stats screen.
