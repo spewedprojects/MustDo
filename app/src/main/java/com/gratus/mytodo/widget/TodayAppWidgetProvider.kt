@@ -72,6 +72,7 @@ class TodayAppWidgetProvider : AppWidgetProvider() {
         val action = intent.action
         
         if (action == ACTION_WIDGET_UPDATE || action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            val pendingResult = goAsync()
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val ids = appWidgetManager.getAppWidgetIds(ComponentName(context, TodayAppWidgetProvider::class.java))
             
@@ -80,30 +81,42 @@ class TodayAppWidgetProvider : AppWidgetProvider() {
             
             // Refresh tasks list view items
             appWidgetManager.notifyAppWidgetViewDataChanged(ids, R.id.widget_list_view)
+            pendingResult.finish()
             
         } else if (action == ACTION_TOGGLE_COMPLETE) {
             val taskId = intent.getIntExtra("task_id", -1)
             if (taskId != -1) {
+                val pendingResult = goAsync()
                 val db = TaskDatabase.getDatabase(context)
                 CoroutineScope(Dispatchers.IO).launch {
-                    val task = db.taskDao().getTaskById(taskId)
-                    if (task != null) {
-                        val updated = task.copy(isCompleted = !task.isCompleted)
-                        val updatedWithReset = if (!updated.isCompleted) updated.copy(repeatedTimes = 0) else updated
-                        db.taskDao().updateTask(updatedWithReset)
-                        
-                        // Cancel or schedule exact reminder alarm
-                        if (updatedWithReset.isCompleted) {
-                            NotificationReceiver.cancelReminder(context, updatedWithReset)
-                        } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
-                            NotificationReceiver.scheduleExactReminder(context, updatedWithReset)
+                    try {
+                        val task = db.taskDao().getTaskById(taskId)
+                        if (task != null) {
+                            val updated = task.copy(isCompleted = !task.isCompleted)
+                            val updatedWithReset = if (!updated.isCompleted) {
+                                updated.copy(repeatedTimes = 0, isReminderActive = true, nextReminderTime = updated.reminderTime)
+                            } else {
+                                updated
+                            }
+                            db.taskDao().updateTask(updatedWithReset)
+                            
+                            // Cancel or schedule exact reminder alarm
+                            if (updatedWithReset.isCompleted) {
+                                NotificationReceiver.cancelReminder(context, updatedWithReset)
+                            } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
+                                NotificationReceiver.scheduleExactReminder(context, updatedWithReset)
+                            }
+                            
+                            // Broadcast update to notify widgets to redraw
+                            val updateIntent = Intent(ACTION_WIDGET_UPDATE).apply {
+                                setPackage(context.packageName)
+                            }
+                            context.sendBroadcast(updateIntent)
                         }
-                        
-                        // Broadcast update to notify widgets to redraw
-                        val updateIntent = Intent(ACTION_WIDGET_UPDATE).apply {
-                            setPackage(context.packageName)
-                        }
-                        context.sendBroadcast(updateIntent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("TodayAppWidgetProvider", "Error toggling task: ${e.message}", e)
+                    } finally {
+                        pendingResult.finish()
                     }
                 }
             }

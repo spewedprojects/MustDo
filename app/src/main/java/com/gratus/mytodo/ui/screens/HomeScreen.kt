@@ -2,6 +2,8 @@
 package com.gratus.mytodo.ui.screens
 
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -56,6 +58,8 @@ fun HomeScreen(
     val showAddDialog by viewModel.showAddDialog.collectAsState()
     val taskToEdit by viewModel.taskToEdit.collectAsState()
     val taskToDelete by viewModel.taskToDelete.collectAsState()
+    val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
+    val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
@@ -64,6 +68,8 @@ fun HomeScreen(
         showAddDialog = showAddDialog,
         taskToEdit = taskToEdit,
         taskToDelete = taskToDelete,
+        isAlarmPermissionGranted = isAlarmGranted,
+        isNotificationPermissionGranted = isNotificationGranted,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -92,6 +98,8 @@ fun HomeScreenContent(
     showAddDialog: Boolean,
     taskToEdit: Task?,
     taskToDelete: Task?,
+    isAlarmPermissionGranted: Boolean,
+    isNotificationPermissionGranted: Boolean,
     onShowAddDialogChange: (Boolean) -> Unit,
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -140,6 +148,103 @@ fun HomeScreenContent(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (colorSchemeType == "minimal") {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                        } else if (colorSchemeType == "colorful") {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ),
+                    border = if (colorSchemeType == "simple" || colorSchemeType == "minimal") {
+                        androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = if (colorSchemeType == "simple") {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    } else {
+                        null
+                    }
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Reminder Notifications Disabled",
+                                fontWeight = FontWeight.Bold,
+                                color = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                        }
+                        
+                        Text(
+                            text = if (!isNotificationPermissionGranted && !isAlarmPermissionGranted) {
+                                "Both Notification permission and Alarms & Reminders permission are required to trigger notifications for urgent scheduled tasks."
+                            } else if (!isNotificationPermissionGranted) {
+                                "Notification permission is required to trigger notifications for urgent scheduled tasks."
+                            } else {
+                                "Alarms & Reminders permission is required to schedule exact notifications for urgent tasks."
+                            },
+                            fontSize = AppFontSizes.small,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = AppFontSizes.medium
+                        )
+                        
+                        Button(
+                            onClick = {
+                                val intent = if (!isNotificationPermissionGranted) {
+                                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = android.net.Uri.fromParts("package", context.packageName, null)
+                                    }
+                                } else {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                            data = android.net.Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    } else {
+                                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = android.net.Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    }
+                                }
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+                                contentColor = if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Text("Grant Permission", fontSize = AppFontSizes.small, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             // Screen Header Label Display
             Box(
                 modifier = Modifier
@@ -465,20 +570,35 @@ fun TaskItemCard(
                 // Show Scheduled Alarm timestamp indicator
                 if (task.reminderTime != null) {
                     Spacer(modifier = Modifier.height(6.dp))
+                    val isReminderActive = task.isReminderActive
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = "Active reminder",
-                            tint = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
+                            imageVector = if (isReminderActive) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                            contentDescription = if (isReminderActive) "Active reminder" else "Suspended reminder",
+                            tint = if (isCompleted || !isReminderActive) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                             modifier = Modifier.size(12.dp)
                         )
-                         Text(
-                            text = "Alert scheduled: " + DateTimeUtils.formatAlarmTime(context, task.reminderTime),
+                        val statusText = if (isReminderActive) {
+                            "Alert scheduled: " + DateTimeUtils.formatAlarmTime(context, task.reminderTime) +
+                                    if (task.repeatedTimes > 0) " (repeated ${task.repeatedTimes}x)" else ""
+                        } else {
+                            "Alert suspended: " + DateTimeUtils.formatAlarmTime(context, task.reminderTime)
+                        }
+                        Text(
+                            text = statusText,
                             fontSize = AppFontSizes.micro,
-                            color = if (isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary,
+                            color = if (isCompleted || !isReminderActive) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -569,6 +689,8 @@ fun HomeScreenMinimalPreview() {
             showAddDialog = false,
             taskToEdit = null,
             taskToDelete = null,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},
@@ -594,6 +716,8 @@ fun HomeScreenSimplePreview() {
             showAddDialog = false,
             taskToEdit = null,
             taskToDelete = null,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},

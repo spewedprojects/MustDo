@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Prevent obfuscation/shrinking of Widget classes, RemoteViewsService, and RemoteViewsFactory
+-keep class com.gratus.mytodo.widget.** { *; }
+-keep class * extends android.widget.RemoteViewsService { *; }
+-keep class * implements android.widget.RemoteViewsService$RemoteViewsFactory { *; }

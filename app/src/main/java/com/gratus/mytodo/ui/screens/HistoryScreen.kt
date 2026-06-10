@@ -1004,20 +1004,23 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (task.reminderTime != null) {
+                        val isReminderActive = task.isReminderActive
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = "Active Reminder",
-                                tint = MaterialTheme.colorScheme.secondary,
+                                imageVector = if (isReminderActive) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                                contentDescription = if (isReminderActive) "Active Reminder" else "Suspended Reminder",
+                                tint = if (isReminderActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                 modifier = Modifier.size(14.dp)
                             )
+                            val statusText = DateTimeUtils.formatAlarmTime(context, task.reminderTime) +
+                                    if (isReminderActive && task.repeatedTimes > 0) " (repeated ${task.repeatedTimes}x)" else if (!isReminderActive) " (suspended)" else ""
                             Text(
-                                text = DateTimeUtils.formatAlarmTime(context, task.reminderTime),
+                                text = statusText,
                                 fontSize = AppFontSizes.extraSmall,
-                                color = MaterialTheme.colorScheme.secondary,
+                                color = if (isReminderActive) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }

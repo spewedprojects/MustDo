@@ -25,6 +25,10 @@ object BackupHelper {
                 put("reminderTime", task.reminderTime ?: JSONObject.NULL)
                 put("isRecurring", task.isRecurring)
                 put("createdSeq", task.createdSeq)
+                put("repeatCount", task.repeatCount)
+                put("repeatedTimes", task.repeatedTimes)
+                put("isReminderActive", task.isReminderActive)
+                put("nextReminderTime", task.nextReminderTime ?: JSONObject.NULL)
             }
             arr.put(obj)
         }
@@ -40,6 +44,7 @@ object BackupHelper {
         for (i in 0 until arr.length()) {
             val obj = arr.getJSONObject(i)
             val reminderTime = if (obj.isNull("reminderTime")) null else obj.getLong("reminderTime")
+            val nextReminderTime = if (obj.has("nextReminderTime") && !obj.isNull("nextReminderTime")) obj.getLong("nextReminderTime") else null
             val task = Task(
                 id = if (obj.has("id")) obj.getInt("id") else 0,
                 title = obj.getString("title"),
@@ -49,7 +54,11 @@ object BackupHelper {
                 isCompleted = obj.getBoolean("isCompleted"),
                 reminderTime = reminderTime,
                 isRecurring = if (obj.has("isRecurring")) obj.getBoolean("isRecurring") else false,
-                createdSeq = if (obj.has("createdSeq")) obj.getLong("createdSeq") else System.currentTimeMillis()
+                createdSeq = if (obj.has("createdSeq")) obj.getLong("createdSeq") else System.currentTimeMillis(),
+                repeatCount = if (obj.has("repeatCount")) obj.getInt("repeatCount") else 1,
+                repeatedTimes = if (obj.has("repeatedTimes")) obj.getInt("repeatedTimes") else 0,
+                isReminderActive = if (obj.has("isReminderActive")) obj.getBoolean("isReminderActive") else true,
+                nextReminderTime = nextReminderTime ?: reminderTime
             )
             tasks.add(task)
         }

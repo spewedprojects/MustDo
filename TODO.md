@@ -44,7 +44,7 @@
         - Smoothly transition or cross-fade between these 4 layout states when thresholds are crossed. - (DONE)
         - Map my historical task array dynamically based on the active state. - (DONE)
 
-All the above tasks were marked done on 07/06/2026
+**_All the above tasks were marked done on 07/06/2026_**
 *********
 
 # NEW TODO #2 (COMPLETED):
@@ -92,5 +92,21 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
     - Since two taps are need to pinch, single tap swipe gesture should automatically be disregarded when this zooming operation is going on.
   - Along with this, add 2 floating action buttons (horizontally placed) at the bottom right of this screen with +/- zoom buttons to do the zooming is user is not in position to use the gesture. - (DONE)
 
-All the above tasks were marked done on 10/06/2026 1315hrs.
+**_All the above tasks were marked done on 10/06/2026 1315hrs_**
+*********
+
+# TODO #4:
+
+### 1. Widget:  - (DONE)
+  - Add widget dark mode
+  - Rectify proguard-rules for preservation of classes during minification - why release build widget gave issues.
+
+### 2. Notification: - (DONE)
+  - Add snooze-like functionality - mark complete button and stop button.
+
+### 3. Homescreen task items: - (DONE)
+  - Rectify alert time changing as per the repeated times.
+  - Add suspended table in database to stop the alert (snooze/dismiss-like) but keep the record.
+
+**_All the above tasks were marked done on 10/06/2026 2240hrs_**
 *********

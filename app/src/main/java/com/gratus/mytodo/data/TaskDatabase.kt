@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 /**
  * Main Room database class for storing user tasks.
  */
-@Database(entities = [Task::class], version = 2, exportSchema = false)
+@Database(entities = [Task::class], version = 3, exportSchema = false)
 abstract class TaskDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
 
@@ -23,6 +23,13 @@ abstract class TaskDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN isReminderActive INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE tasks ADD COLUMN nextReminderTime INTEGER")
+            }
+        }
+
         fun getDatabase(context: Context): TaskDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -30,7 +37,7 @@ abstract class TaskDatabase : RoomDatabase() {
                     TaskDatabase::class.java,
                     "task_database"
                 )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration() // Reset schema in development if any fields shift
                 .build()
                 INSTANCE = instance

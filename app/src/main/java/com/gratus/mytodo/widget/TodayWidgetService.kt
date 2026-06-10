@@ -13,6 +13,7 @@ import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import androidx.core.content.ContextCompat
 
 /**
  * Service that provides the adapter/factory for the list view inside the widget.
@@ -24,7 +25,6 @@ class TodayWidgetService : RemoteViewsService() {
 }
 
 class TodayWidgetFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
-    private val db = TaskDatabase.getDatabase(context)
     private var tasks = listOf<Task>()
 
     override fun onCreate() {
@@ -33,8 +33,14 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
 
     override fun onDataSetChanged() {
         val dateStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
-        tasks = runBlocking(Dispatchers.IO) {
-            db.taskDao().getTasksForDateDirect(dateStr)
+        try {
+            val db = TaskDatabase.getDatabase(context)
+            tasks = runBlocking(Dispatchers.IO) {
+                db.taskDao().getTasksForDateDirect(dateStr)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("TodayWidgetFactory", "Error loading tasks for widget: ${e.message}", e)
+            tasks = emptyList()
         }
     }
 
@@ -61,6 +67,14 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
             titleSpan.setSpan(StrikethroughSpan(), 0, task.title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         rv.setTextViewText(R.id.widget_item_title, titleSpan)
+
+        // Programmatically set the text color based on task completion status
+        val titleColor = if (task.isCompleted) {
+            ContextCompat.getColor(context, R.color.widget_empty_text)
+        } else {
+            ContextCompat.getColor(context, R.color.widget_text_primary)
+        }
+        rv.setTextColor(R.id.widget_item_title, titleColor)
 
         // Set priority level and background shape
         rv.setTextViewText(R.id.widget_item_priority, task.priority.toString())

@@ -96,6 +96,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putInt("reminder_repeat_interval", minutes).apply()
     }
 
+    private val _isAlarmPermissionGranted = MutableStateFlow(true)
+    val isAlarmPermissionGranted: StateFlow<Boolean> = _isAlarmPermissionGranted.asStateFlow()
+
+    private val _isNotificationPermissionGranted = MutableStateFlow(true)
+    val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
+
+    fun checkPermissions(context: Context) {
+        val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        _isNotificationPermissionGranted.value = notificationGranted
+
+        val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            try {
+                alarmManager.canScheduleExactAlarms()
+            } catch (e: Exception) {
+                false
+            }
+        } else {
+            true
+        }
+        _isAlarmPermissionGranted.value = alarmGranted
+    }
+
     // Dialog / Edit Screen States (preserved across screen rotations)
     private val _showAddDialog = MutableStateFlow(false)
     val showAddDialog: StateFlow<Boolean> = _showAddDialog.asStateFlow()
@@ -141,6 +171,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _lastUsedPriority.value = repository.getLastUsedPriority()
         }
+        checkPermissions(application)
+        updateWidget()
     }
 
     /**
@@ -262,7 +294,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isRecurring = everydayDaysCount > 0,
                 createdSeq = System.currentTimeMillis(),
                 repeatCount = repeatCount,
-                repeatedTimes = 0
+                repeatedTimes = 0,
+                isReminderActive = true,
+                nextReminderTime = reminderTimeMillis
             )
 
             // Save last used priority
@@ -280,7 +314,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Replicate to custom selected future dates
             replicateDates.forEach { futureDate ->
                 if (futureDate != dateStr) {
-                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null)
+                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null, nextReminderTime = null)
                     repository.insertTask(futureTask)
                 }
             }
@@ -293,7 +327,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         add(Calendar.DAY_OF_YEAR, i)
                     }
                     val dailyStr = DateTimeUtils.formatDbDate(runCal)
-                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null)
+                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null, nextReminderTime = null)
                     repository.insertTask(everydayTask)
                 }
             }
@@ -308,7 +342,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleCompleted(task: Task) {
         viewModelScope.launch {
             val updated = task.copy(isCompleted = !task.isCompleted)
-            val updatedWithReset = if (!updated.isCompleted) updated.copy(repeatedTimes = 0) else updated
+            val updatedWithReset = if (!updated.isCompleted) {
+                updated.copy(repeatedTimes = 0, isReminderActive = true, nextReminderTime = updated.reminderTime)
+            } else {
+                updated
+            }
             repository.updateTask(updatedWithReset)
             
             // Cancel alarm if marked completed
@@ -347,7 +385,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 dateAdded = dateStr,
                 reminderTime = reminderTimeMillis,
                 repeatCount = repeatCount,
-                repeatedTimes = 0
+                repeatedTimes = 0,
+                isReminderActive = true,
+                nextReminderTime = reminderTimeMillis
             )
             
             repository.updateTask(updated)

@@ -2,6 +2,7 @@ package com.gratus.mytodo.ui.screens
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -45,11 +46,15 @@ fun SettingsScreen(
     val activeTheme by viewModel.settingsTheme.collectAsState()
     val activeScheme by viewModel.settingsColorScheme.collectAsState()
     val activeInterval by viewModel.settingsReminderInterval.collectAsState()
+    val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
+    val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
 
     SettingsScreenContent(
         activeTheme = activeTheme,
         activeScheme = activeScheme,
         activeInterval = activeInterval,
+        isAlarmPermissionGranted = isAlarmGranted,
+        isNotificationPermissionGranted = isNotificationGranted,
         onThemeChange = { viewModel.setTheme(it) },
         onSchemeChange = { viewModel.setColorScheme(it) },
         onIntervalChange = { viewModel.setReminderInterval(it) },
@@ -110,6 +115,8 @@ fun SettingsScreenContent(
     activeTheme: String,
     activeScheme: String,
     activeInterval: Int,
+    isAlarmPermissionGranted: Boolean,
+    isNotificationPermissionGranted: Boolean,
     onThemeChange: (String) -> Unit,
     onSchemeChange: (String) -> Unit,
     onIntervalChange: (Int) -> Unit,
@@ -316,6 +323,108 @@ fun SettingsScreenContent(
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "System Permissions Status",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    // Alarms & Reminders Permission Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Alarms & Reminders",
+                            fontSize = AppFontSizes.medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isAlarmPermissionGranted) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (isAlarmPermissionGranted) "Active" else "Disabled",
+                                color = if (isAlarmPermissionGranted) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                fontSize = AppFontSizes.extraSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Notification Permission Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Notifications",
+                            fontSize = AppFontSizes.medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isNotificationPermissionGranted) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (isNotificationPermissionGranted) "Active" else "Disabled",
+                                color = if (isNotificationPermissionGranted) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                fontSize = AppFontSizes.extraSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Change in System Settings",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = AppFontSizes.small,
+                            modifier = Modifier
+                                .clickable {
+                                    val intent = if (!isNotificationPermissionGranted) {
+                                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = android.net.Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    } else {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                            Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                                data = android.net.Uri.fromParts("package", context.packageName, null)
+                                            }
+                                        } else {
+                                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = android.net.Uri.fromParts("package", context.packageName, null)
+                                            }
+                                        }
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(vertical = 4.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = "Reminder Repeat Interval",
@@ -510,6 +619,8 @@ fun SettingsScreenPreview() {
             activeTheme = "light",
             activeScheme = "minimal",
             activeInterval = 10,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
             onThemeChange = {},
             onSchemeChange = {},
             onIntervalChange = {},
