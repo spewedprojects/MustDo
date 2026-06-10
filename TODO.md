@@ -63,7 +63,7 @@ All the above tasks were marked done on 07/06/2026
   - When system is in light mode - systembar icons are in dark, and the app is in dark mode (set manually) - the systembar icons remain dark, they should compliment the theme mode of the app. - (DONE)
   - The delete confirmation dialog also has to follow the app's current theme and color scheme, it currently does not. - (DONE)
 
-### 4. History screen and stats screen:  - (DONE)
+### 4. History screen and stats screen: - (DONE)
   - Disable future dates tasks history screen. - (DONE)
   - Make stats screen content scrollable so that it can be usable in landscape mode. - (DONE)
   - Total Count of tasks-$y (in Completion rate card "$x of $y Done") should only show total until today's date in Stats screen. - (DONE)
@@ -73,5 +73,24 @@ All the above tasks were marked done on 07/06/2026
   - Add a summary section to it; in it, explain how fundamentally have things changed over time - use the current codebase analysis file to compare against. - (DONE)
 
 
-All the above tasks were marked done on 10/06/2026
+All the above tasks were marked done on 10/06/2026 0015hrs.
+*********
+
+# TODO #3 (COMPLETED):
+
+### 1. Make home screen widget: - (DONE)
+  - That shows today's tasks. - (DONE)
+  - Has ability to mark tasks as completed. - (DONE)
+  - Shows priority level - (DONE)
+
+### 2. Task dialog: - (DONE)
+  - Reminder notification: Ability to repeat itself after $x minutes. Button for this can grouped along with existing "Schedule" button. Repeat 1x/2x/3x/4x with certain interval. - (DONE)
+  - Add interval setting in settings screen, this shall be applied to all intervals. - (DONE)
+
+### 3. History screen: - (DONE)
+  - The pinch gesture and navigation drawer gesture interfere with each other, leading to pinch to occur in specific axis to work properly. - (DONE)
+    - Since two taps are need to pinch, single tap swipe gesture should automatically be disregarded when this zooming operation is going on.
+  - Along with this, add 2 floating action buttons (horizontally placed) at the bottom right of this screen with +/- zoom buttons to do the zooming is user is not in position to use the gesture. - (DONE)
+
+All the above tasks were marked done on 10/06/2026 1315hrs.
 *********

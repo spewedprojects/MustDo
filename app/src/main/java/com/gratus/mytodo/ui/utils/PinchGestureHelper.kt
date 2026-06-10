@@ -23,15 +23,21 @@ suspend fun PointerInputScope.detectPinchZoom(
             val event = awaitPointerEvent()
             val canceled = event.changes.any { it.isConsumed }
             if (!canceled) {
-                val zoom = event.calculateZoom()
-                if (zoom != 1f) {
-                    accumulatedZoom *= zoom
-                    if (accumulatedZoom > 1.25f) {
-                        onZoomIn()
-                        accumulatedZoom = 1f // Reset to prevent double-firing in same gesture
-                    } else if (accumulatedZoom < 0.75f) {
-                        onZoomOut()
-                        accumulatedZoom = 1f // Reset to prevent double-firing in same gesture
+                val activePointers = event.changes.filter { it.pressed }
+                if (activePointers.size >= 2) {
+                    // Consume changes to prevent scrolling or drawer opening during pinch-to-zoom
+                    event.changes.forEach { it.consume() }
+
+                    val zoom = event.calculateZoom()
+                    if (zoom != 1f) {
+                        accumulatedZoom *= zoom
+                        if (accumulatedZoom > 1.25f) {
+                            onZoomIn()
+                            accumulatedZoom = 1f // Reset to prevent double-firing in same gesture
+                        } else if (accumulatedZoom < 0.75f) {
+                            onZoomOut()
+                            accumulatedZoom = 1f // Reset to prevent double-firing in same gesture
+                        }
                     }
                 }
             }

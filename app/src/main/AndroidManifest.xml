@@ -19,6 +19,26 @@
         <receiver
             android:name="com.gratus.mytodo.components.NotificationReceiver"
             android:exported="false" />
+
+        <!-- Today Task App Widget -->
+        <receiver
+            android:name="com.gratus.mytodo.widget.TodayAppWidgetProvider"
+            android:exported="true"
+            android:label="MustDos Today">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.gratus.mytodo.action.WIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_info" />
+        </receiver>
+
+        <service
+            android:name="com.gratus.mytodo.widget.TodayWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

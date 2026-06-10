@@ -62,7 +62,8 @@ fun TaskAddDialog(
         targetDate: Calendar,
         replicateDates: List<String>,
         everydayCount: Int,
-        reminderTimeMillis: Long?
+        reminderTimeMillis: Long?,
+        repeatCount: Int
     ) -> Unit,
     taskToEdit: Task? = null
 ) {
@@ -79,6 +80,7 @@ fun TaskAddDialog(
 
     // Alarm reminder state (timestamp milliseconds)
     var reminderTimestamp by rememberSaveable { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
+    var repeatCount by rememberSaveable { mutableStateOf(taskToEdit?.repeatCount ?: 1) }
 
     // Recurrence selection
     var everydayCount by rememberSaveable { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
@@ -361,8 +363,44 @@ fun TaskAddDialog(
                         )
                     }
 
+                    val showTimePicker = {
+                        val pickedCal = Calendar.getInstance().apply {
+                            time = initialDate.time
+                        }
+                        val currentCal = Calendar.getInstance()
+                        val defaultHour = if (reminderTimestamp != null) {
+                            Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.HOUR_OF_DAY)
+                        } else {
+                            currentCal.get(Calendar.HOUR_OF_DAY)
+                        }
+                        val defaultMinute = if (reminderTimestamp != null) {
+                            Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.MINUTE)
+                        } else {
+                            currentCal.get(Calendar.MINUTE)
+                        }
+
+                        TimePickerDialog(
+                            context,
+                            { _, hourOfDay, minute ->
+                                pickedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                pickedCal.set(Calendar.MINUTE, minute)
+                                pickedCal.set(Calendar.SECOND, 0)
+                                pickedCal.set(Calendar.MILLISECOND, 0)
+                                
+                                if (pickedCal.timeInMillis > System.currentTimeMillis()) {
+                                    reminderTimestamp = pickedCal.timeInMillis
+                                } else {
+                                    Toast.makeText(context, "Reminder must be set in the future!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            defaultHour,
+                            defaultMinute,
+                            android.text.format.DateFormat.is24HourFormat(context)
+                        ).show()
+                    }
+
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (reminderTimestamp != null) {
@@ -375,51 +413,65 @@ fun TaskAddDialog(
                             }
                         }
                         
-                        Button(
-                            onClick = {
-                                val pickedCal = Calendar.getInstance().apply {
-                                    time = initialDate.time
+                        if (reminderTimestamp == null) {
+                            Button(
+                                onClick = { showTimePicker() }
+                            ) {
+                                Text("Schedule")
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = RoundedCornerShape(20.dp)
+                                    )
+                                    .clip(RoundedCornerShape(20.dp)),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Edit Segment
+                                Box(
+                                    modifier = Modifier
+                                        .clickable { showTimePicker() }
+                                        .background(MaterialTheme.colorScheme.primaryContainer)
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Edit",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
                                 }
-                                val currentCal = Calendar.getInstance()
-                                val defaultHour = if (reminderTimestamp != null) {
-                                    Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.HOUR_OF_DAY)
-                                } else {
-                                    currentCal.get(Calendar.HOUR_OF_DAY)
-                                }
-                                val defaultMinute = if (reminderTimestamp != null) {
-                                    Calendar.getInstance().apply { timeInMillis = reminderTimestamp!! }.get(Calendar.MINUTE)
-                                } else {
-                                    currentCal.get(Calendar.MINUTE)
-                                }
+                                
+                                // Separator line
+                                Divider(
+                                    modifier = Modifier
+                                        .height(20.dp)
+                                        .width(1.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
 
-                                TimePickerDialog(
-                                    context,
-                                    { _, hourOfDay, minute ->
-                                        pickedCal.set(Calendar.HOUR_OF_DAY, hourOfDay)
-                                        pickedCal.set(Calendar.MINUTE, minute)
-                                        pickedCal.set(Calendar.SECOND, 0)
-                                        pickedCal.set(Calendar.MILLISECOND, 0)
-                                        
-                                        if (pickedCal.timeInMillis > System.currentTimeMillis()) {
-                                            reminderTimestamp = pickedCal.timeInMillis
-                                        } else {
-                                            Toast.makeText(context, "Reminder must be set in the future!", Toast.LENGTH_SHORT).show()
+                                // Cycle Repeat Segment
+                                Box(
+                                    modifier = Modifier
+                                        .clickable {
+                                            repeatCount = if (repeatCount >= 4) 1 else repeatCount + 1
                                         }
-                                    },
-                                    defaultHour,
-                                    defaultMinute,
-                                    android.text.format.DateFormat.is24HourFormat(context)
-                                ).show()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        ) {
-                            Text(if (reminderTimestamp == null) "Schedule" else "Edit")
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${repeatCount}x",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
+                    }}
 
                 if (taskToEdit == null) {
                     Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
@@ -603,7 +655,8 @@ fun TaskAddDialog(
                                 initialDate,
                                 replicationDates.toList(),
                                 everydayCount,
-                                reminderTimestamp
+                                reminderTimestamp,
+                                repeatCount
                             )
                         },
                         modifier = Modifier.testTag("task_confirm_button")
@@ -669,7 +722,7 @@ fun TaskAddDialogPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _ -> }
+            onConfirm = { _, _, _, _, _, _, _, _ -> }
         )
     }
 }

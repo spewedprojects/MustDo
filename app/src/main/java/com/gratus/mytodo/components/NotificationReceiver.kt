@@ -1,5 +1,6 @@
 package com.gratus.mytodo.components
 
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,6 +10,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.gratus.mytodo.MainActivity
+import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.R
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,20 @@ class NotificationReceiver : BroadcastReceiver() {
                 // Show notification if task is not completed yet
                 if (task != null && !task.isCompleted) {
                     showNotification(context, task.id, task.title, task.priority, task.description)
+
+                    // Handle repeating alerts: 1x to 4x
+                    if (task.repeatedTimes + 1 < task.repeatCount) {
+                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                        val intervalMins = sharedPrefs.getInt("reminder_repeat_interval", 10)
+                        val nextAlarmTime = System.currentTimeMillis() + (intervalMins * 60 * 1000L)
+                        
+                        val updatedTask = task.copy(
+                            repeatedTimes = task.repeatedTimes + 1,
+                            reminderTime = nextAlarmTime
+                        )
+                        db.taskDao().updateTask(updatedTask)
+                        scheduleExactReminder(context, updatedTask)
+                    }
                 }
             } finally {
                 pendingResult.finish()
@@ -86,5 +102,45 @@ class NotificationReceiver : BroadcastReceiver() {
             .build()
 
         manager.notify(id, notification)
+    }
+
+    companion object {
+        fun scheduleExactReminder(context: Context, task: Task) {
+            val time = task.reminderTime ?: return
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                putExtra("task_id", task.id)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                task.id,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                }
+            } catch (e: SecurityException) {
+                android.util.Log.e("NotificationReceiver", "Permission denied for exact alarms: ${e.message}")
+            }
+        }
+
+        fun cancelReminder(context: Context, task: Task) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+            val intent = Intent(context, NotificationReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                task.id,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        }
     }
 }

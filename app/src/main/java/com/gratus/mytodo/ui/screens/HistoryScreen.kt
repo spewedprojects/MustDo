@@ -116,13 +116,16 @@ fun HistoryScreenContent(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(pinchZoomModifier)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(pinchZoomModifier)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         // Dedicated controls layout inside the screen for gorgeous scannability
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -329,9 +332,47 @@ fun HistoryScreenContent(
                         colorSchemeType = colorSchemeType
                     )
                 }
-            }
         }
     }
+}
+
+    // Horizontal Zoom floating action buttons placed at bottom right corner
+    Row(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FloatingActionButton(
+            onClick = { onZoomChange(-1) },
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Remove,
+                contentDescription = "Zoom Out",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        
+        FloatingActionButton(
+            onClick = { onZoomChange(1) },
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Zoom In",
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
 }
 
 /**
@@ -376,7 +417,7 @@ fun YearView(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         groupedByYear.forEach { (year, yearTasks) ->
             item(key = year) {
@@ -501,7 +542,7 @@ fun MonthView(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         groupedByMonth.forEach { (monthStr, monthTasks) ->
             item(key = monthStr) {
@@ -640,7 +681,7 @@ fun WeekView(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         groupedByWeek.forEach { (weekStartStr, weekTasks) ->
             item(key = weekStartStr) {
@@ -790,7 +831,7 @@ fun ExpandedView(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         grouped.keys.toList().sortedDescending().forEach { dateStr ->
             val dateObj = DateTimeUtils.parseDbDate(dateStr) ?: Date()

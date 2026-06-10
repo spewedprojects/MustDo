@@ -22,34 +22,50 @@ app/src/main/
 │   │   ├── TaskRepository.kt                 # Repository layer abstracting DAO operations
 │   │   └── utils/
 │   │       └── BackupHelper.kt               # Backup serializer/deserializer to JSON
-│   └── ui/
-│       ├── MainViewModel.kt                  # State-holder: Business logic, stats calculation, alarm registration
-│       ├── components/
-│       │   ├── FaintBackground.kt            # Draws custom canvas graphics/gradients based on theme
-│       │   ├── StyledTextParser.kt           # Compiles markdown bold/italic/bullets into AnnotatedStrings
-│       │   └── TaskAddDialog.kt              # Scrollable dialog for task addition and modification
-│       ├── screens/
-│       │   ├── HomeScreen.kt                 # Daily task list view, datepicker, and HorizontalPager
-│       │   ├── HistoryScreen.kt              # Calendar groups, search/filters, and cumulative zoom gestures
-│       │   ├── SettingsScreen.kt             # Dark/Light preferences, theme scheme selectors, and backup options
-│       │   └── StatsScreen.kt                # Scrollable circular completion progress, streaks, and weekly chart
-│       ├── theme/
-│       │   ├── Color.kt                      # Defines core colors, priority levels, and scheme utilities
-│       │   ├── Theme.kt                      # Integrates Light/Dark palettes into SoftTodoTheme
-│       │   └── Type.kt                       # Houses default typography styles with global +2sp offset
-│       └── utils/
-│           ├── DateTimeUtils.kt              # Thread-safe date formatters respecting 12h/24h system clock
-│           └── PinchGestureHelper.kt         # Helper function for tracking cumulative pinch-to-zoom gestures
+│   ├── ui/
+│   │   ├── MainViewModel.kt                  # State-holder: Business logic, stats calculation, alarm registration
+│   │   ├── components/
+│   │   │   ├── FaintBackground.kt            # Draws custom canvas graphics/gradients based on theme
+│   │   │   ├── StyledTextParser.kt           # Compiles markdown bold/italic/bullets into AnnotatedStrings
+│   │   │   └── TaskAddDialog.kt              # Scrollable dialog with Segmented Edit/Repeat buttons
+│   │   ├── screens/
+│   │   │   ├── HomeScreen.kt                 # Daily task list view, datepicker, and HorizontalPager
+│   │   │   ├── HistoryScreen.kt              # Calendar groups, zoom FABs, and cumulative zoom gestures
+│   │   │   ├── SettingsScreen.kt             # Preferences, scheme selectors, repeat intervals, and backups
+│   │   │   └── StatsScreen.kt                # Scrollable circular completion progress, streaks, and weekly chart
+│   │   ├── theme/
+│   │   │   ├── Color.kt                      # Defines core colors, priority levels, and scheme utilities
+│   │   │   ├── Theme.kt                      # Integrates Light/Dark palettes into SoftTodoTheme
+│   │   │   └── Type.kt                       # Houses default typography styles with global +2sp offset
+│   │   └── utils/
+│   │       ├── DateTimeUtils.kt              # Thread-safe date formatters respecting 12h/24h system clock
+│   │       └── PinchGestureHelper.kt         # Helper function for tracking cumulative pinch-to-zoom gestures
+│   └── widget/
+│       ├── TodayAppWidgetProvider.kt         # BroadcastReceiver for widget lifecycle & click events
+│       └── TodayWidgetService.kt             # RemoteViewsService for widget list item generation
 └── res/
     ├── drawable/
-    │   └── icon_v3.xml                       # Vector asset used for launcher and notification small icon
+    │   ├── ic_widget_check.xml               # Checkbox icon for widget items
+    │   ├── ic_widget_uncheck.xml             # Unchecked checkbox icon for widget items
+    │   ├── icon_v3.xml                       # Vector asset used for launcher and notification small icon
+    │   ├── widget_bg.xml                     # Background for widget card
+    │   ├── widget_item_bg.xml                # Background for widget task rows
+    │   ├── widget_priority_1.xml             # Priority 1 background drawable for widget
+    │   ├── widget_priority_2.xml             # Priority 2 background drawable for widget
+    │   ├── widget_priority_3.xml             # Priority 3 background drawable for widget
+    │   ├── widget_priority_4.xml             # Priority 4 background drawable for widget
+    │   └── widget_priority_completed.xml     # Completed state priority background drawable for widget
+    ├── layout/
+    │   ├── widget_task_item.xml              # Widget item card row layout
+    │   └── widget_today.xml                  # Main Today widget layout container
     ├── values/
     │   ├── colors.xml                        # Basic standard fallback native resource colors
     │   ├── strings.xml                       # Core localization properties
     │   └── themes.xml                        # Legacy XML styles providing parent compatibility
     └── xml/
         ├── backup_rules.xml                  # Rules for Android Auto Backup
-        └── data_extraction_rules.xml         # Rules for cloud/device backup extraction
+        ├── data_extraction_rules.xml         # Rules for cloud/device backup extraction
+        └── widget_today_info.xml             # Configuration rules for the widget
 ```
 
 ---
@@ -83,6 +99,7 @@ graph TD
    - `MainActivity` collects these flows as compose state. This triggers a recomposition of `SoftTodoTheme` and `FaintBackground`, changing the entire app's look instantly.
 3. **Database-UI Reactive Loop:** All queries inside `TaskDao` return `Flow<List<Task>>`. Any operation (e.g. marking a task complete on the `HomeScreen`) writes to Room, which automatically forces the corresponding database flow to emit the new data. Screens instantly recompose with the updated task lists without manual refreshing.
 4. **Alarms Synchronization:** When tasks are added, completed, updated, or deleted, `MainViewModel` schedules or cancels exact alarms using `AlarmManager`.
+5. **Widget Reactive Syncing:** When task state changes, `MainViewModel` broadcasts a `com.gratus.mytodo.action.WIDGET_UPDATE` intent, causing `TodayAppWidgetProvider` to request list view updates. Tapping the checkbox in the widget fires a `com.gratus.mytodo.action.TOGGLE_COMPLETE` broadcast which toggles the task completion in the database on a background coroutine, triggers database alarm rescheduling via `NotificationReceiver`, and alerts the widget to redraw.
 
 ---
 
@@ -134,9 +151,11 @@ Colors are managed inside `Theme.kt` and `Color.kt` through standard Compose par
 ## 6. Recommended Helper Classes & Refinements
 
 1. **`DateTimeUtils`:** Thread-safe utility helper that centralizes all Date/Time formatting and parsing operations. It queries `DateFormat.is24HourFormat(context)` to dynamically display reminder timestamps in either 12-hour or 24-hour format matching the system preferences.
-2. **`PinchGestureHelper`:** Implements `detectPinchZoom` which accumulates relative zoom events over a single gesture cycle and triggers zoom-in or zoom-out callbacks only when threshold boundaries (e.g., > 1.25x or < 0.75x) are crossed, resolving slow gesture dead-zones.
+2. **`PinchGestureHelper`:** Implements `detectPinchZoom` which accumulates relative zoom events over a single gesture cycle and triggers zoom-in or zoom-out callbacks only when threshold boundaries (e.g., > 1.25x or < 0.75x) are crossed, resolving slow gesture dead-zones. Checks pointer counts so single-finger navigation or drawer gestures are ignored by the zoom handler.
 3. **`NotificationReceiver`:** Extends `BroadcastReceiver` and uses `goAsync()` to run database lookups on a background coroutine while keeping the receiver process alive. Uses a local app drawable resource `R.drawable.icon_v3` for the notification's small icon.
 4. **`USE_EXACT_ALARM`:** The app declares `USE_EXACT_ALARM` permission in its manifest. This grants the app the ability to schedule exact alarm events at install-time on Android 13+ without requiring manual user toggles in system settings.
+5. **`TodayAppWidgetProvider` & `TodayWidgetService`**: Implements a home screen widget showing today's tasks using `RemoteViews` and a `RemoteViewsService`. Supports task completions toggled directly from the home screen using pending intent templates and custom broadcast handlers.
+6. **Room Database Migration v2**: SQLite migrations defined by `MIGRATION_1_2` safely upgrade existing user tables to include `repeatCount` and `repeatedTimes` properties, supporting recurring reminder alert reschedule loops without data loss.
 
 ---
 
@@ -158,3 +177,6 @@ The application has undergone several key transitions since its initial version:
 | **Dialog State Rotation** | Closing the add/edit dialog on rotation caused data loss. | Moves dialog state and edited task items to `MainViewModel` and implements `rememberSaveable` on dialog input fields to persist state across device rotations. |
 | **Alarm Time Info** | Hides alert time info from completed tasks or once the alarm time has passed. | Keeps the "Alert scheduled: ..." info text visible on the home task card even after it has triggered or the task has been marked complete. |
 | **Header Date text** | Displayed formatted date in TopAppBar for all active dates. | Displays `"Today"` instead of formatted date in the TopAppBar of `MainActivity` if the active date matches the current system date. |
+| **Home Screen Widget** | No widget support. | Adds an interactive "MustDo Today" widget showing today's tasks, priority levels, completion state, and supporting direct task check-off toggle. |
+| **Repeating Reminders** | Standard alarm reminder triggers once. | Supports `1x` (default) up to `4x` repeat reminder cycles at a customizable interval configured in Settings. UI replaces schedule button with an Edit/Repeat Segmented Button when active. |
+| **History Zoom / Gestures** | Pinch-to-zoom gesture conflicted with navigation drawer drag and had no alternative control buttons. | Resolves touch conflict by ignoring single-finger swipes. Adds horizontal `+` and `-` FAB controls in the bottom right corner with `80.dp` bottom list padding to clear them. |

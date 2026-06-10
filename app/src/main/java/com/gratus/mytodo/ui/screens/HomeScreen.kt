@@ -71,11 +71,11 @@ fun HomeScreen(
         onSetDate = { viewModel.setDate(it) },
         onToggleComplete = { viewModel.toggleCompleted(it) },
         onDeleteTask = { viewModel.deleteTask(it) },
-        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
-            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
+        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount ->
+            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount)
         },
-        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis ->
-            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis)
+        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount ->
+            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount)
         },
         getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) }
     )
@@ -99,8 +99,8 @@ fun HomeScreenContent(
     onSetDate: (Calendar) -> Unit,
     onToggleComplete: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
-    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?) -> Unit,
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int) -> Unit,
     getTasksForDate: (String) -> Flow<List<Task>>
 ) {
     val context = LocalContext.current
@@ -286,8 +286,8 @@ fun HomeScreenContent(
             initialDate = currentDate,
             lastUsedPriority = lastUsedPriority,
             onDismiss = { onShowAddDialogChange(false) },
-            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis ->
-                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis)
+            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount ->
+                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount)
                 onShowAddDialogChange(false)
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
             }
@@ -303,8 +303,8 @@ fun HomeScreenContent(
             lastUsedPriority = lastUsedPriority,
             taskToEdit = taskToEdit,
             onDismiss = { onTaskToEditChange(null) },
-            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis ->
-                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis)
+            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount ->
+                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
             }
@@ -576,8 +576,8 @@ fun HomeScreenMinimalPreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _ -> },
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
@@ -601,8 +601,8 @@ fun HomeScreenSimplePreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _ -> },
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }

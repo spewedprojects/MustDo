@@ -88,6 +88,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _lastUsedPriority = MutableStateFlow(sharedPrefs.getInt("last_priority", 1))
     val lastUsedPriority: StateFlow<Int> = _lastUsedPriority.asStateFlow()
 
+    private val _settingsReminderInterval = MutableStateFlow(sharedPrefs.getInt("reminder_repeat_interval", 10))
+    val settingsReminderInterval: StateFlow<Int> = _settingsReminderInterval.asStateFlow()
+
+    fun setReminderInterval(minutes: Int) {
+        _settingsReminderInterval.value = minutes
+        sharedPrefs.edit().putInt("reminder_repeat_interval", minutes).apply()
+    }
+
     // Dialog / Edit Screen States (preserved across screen rotations)
     private val _showAddDialog = MutableStateFlow(false)
     val showAddDialog: StateFlow<Boolean> = _showAddDialog.asStateFlow()
@@ -240,7 +248,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         targetDate: Calendar,
         replicateDates: List<String>, // yyyy-MM-dd format future copies
         everydayDaysCount: Int = 0, // if everyday is checked, range of next everyday copies
-        reminderTimeMillis: Long? = null
+        reminderTimeMillis: Long? = null,
+        repeatCount: Int = 1
     ) {
         viewModelScope.launch {
             val dateStr = DateTimeUtils.formatDbDate(targetDate)
@@ -251,7 +260,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 dateAdded = dateStr,
                 reminderTime = reminderTimeMillis,
                 isRecurring = everydayDaysCount > 0,
-                createdSeq = System.currentTimeMillis()
+                createdSeq = System.currentTimeMillis(),
+                repeatCount = repeatCount,
+                repeatedTimes = 0
             )
 
             // Save last used priority
@@ -286,6 +297,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     repository.insertTask(everydayTask)
                 }
             }
+
+            updateWidget()
         }
     }
 
@@ -295,14 +308,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleCompleted(task: Task) {
         viewModelScope.launch {
             val updated = task.copy(isCompleted = !task.isCompleted)
-            repository.updateTask(updated)
+            val updatedWithReset = if (!updated.isCompleted) updated.copy(repeatedTimes = 0) else updated
+            repository.updateTask(updatedWithReset)
             
             // Cancel alarm if marked completed
-            if (updated.isCompleted) {
-                cancelReminder(updated)
-            } else if (updated.reminderTime != null && updated.reminderTime > System.currentTimeMillis()) {
-                scheduleExactReminder(updated)
+            if (updatedWithReset.isCompleted) {
+                cancelReminder(updatedWithReset)
+            } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
+                scheduleExactReminder(updatedWithReset)
             }
+            updateWidget()
         }
     }
 
@@ -315,7 +330,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         description: String,
         priority: Int,
         targetDate: Calendar,
-        reminderTimeMillis: Long? = null
+        reminderTimeMillis: Long? = null,
+        repeatCount: Int = 1
     ) {
         viewModelScope.launch {
             val original = repository.getTaskById(id) ?: return@launch
@@ -329,7 +345,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 description = description,
                 priority = priority,
                 dateAdded = dateStr,
-                reminderTime = reminderTimeMillis
+                reminderTime = reminderTimeMillis,
+                repeatCount = repeatCount,
+                repeatedTimes = 0
             )
             
             repository.updateTask(updated)
@@ -338,6 +356,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!updated.isCompleted && reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
                 scheduleExactReminder(updated)
             }
+            updateWidget()
         }
     }
 
@@ -348,6 +367,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteTask(task)
             cancelReminder(task)
+            updateWidget()
         }
     }
 
@@ -355,43 +375,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Alarm Notification Scheduler.
      */
     private fun scheduleExactReminder(task: Task) {
-        val time = task.reminderTime ?: return
-        val application = getApplication<Application>()
-        val alarmManager = application.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        val intent = Intent(application, NotificationReceiver::class.java).apply {
-            putExtra("task_id", task.id)
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            application,
-            task.id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pendingIntent)
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pendingIntent)
-            }
-        } catch (e: SecurityException) {
-            Log.e("MainViewModel", "Permission denied for exact alarms: ${e.message}")
-        }
+        NotificationReceiver.scheduleExactReminder(getApplication(), task)
     }
 
     private fun cancelReminder(task: Task) {
-        val application = getApplication<Application>()
-        val alarmManager = application.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        NotificationReceiver.cancelReminder(getApplication(), task)
+    }
 
-        val intent = Intent(application, NotificationReceiver::class.java)
-        val pendingIntent = PendingIntent.getBroadcast(
-            application,
-            task.id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        alarmManager.cancel(pendingIntent)
+    private fun updateWidget() {
+        val context = getApplication<Application>()
+        val intent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
+            setPackage(context.packageName)
+        }
+        context.sendBroadcast(intent)
     }
 
     /**
@@ -530,6 +526,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val tasks = BackupHelper.importTasksFromJson(jsonStr)
                 if (tasks.isNotEmpty()) {
                     repository.insertTasks(tasks)
+                    updateWidget()
                     onComplete(true)
                 } else {
                     onComplete(false)

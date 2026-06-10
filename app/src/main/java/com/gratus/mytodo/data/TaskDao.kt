@@ -35,6 +35,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks")
     suspend fun getAllTasksDirect(): List<Task>
 
+    @Query("SELECT * FROM tasks WHERE dateAdded = :date ORDER BY createdSeq ASC")
+    suspend fun getTasksForDateDirect(date: String): List<Task>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTasks(tasks: List<Task>)
 }

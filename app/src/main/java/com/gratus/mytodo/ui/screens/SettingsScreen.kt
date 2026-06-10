@@ -44,12 +44,15 @@ fun SettingsScreen(
 ) {
     val activeTheme by viewModel.settingsTheme.collectAsState()
     val activeScheme by viewModel.settingsColorScheme.collectAsState()
+    val activeInterval by viewModel.settingsReminderInterval.collectAsState()
 
     SettingsScreenContent(
         activeTheme = activeTheme,
         activeScheme = activeScheme,
+        activeInterval = activeInterval,
         onThemeChange = { viewModel.setTheme(it) },
         onSchemeChange = { viewModel.setColorScheme(it) },
+        onIntervalChange = { viewModel.setReminderInterval(it) },
         onExportJson = { outputStream ->
             try {
                 val json = viewModel.exportBackup()
@@ -106,8 +109,10 @@ fun SettingsScreen(
 fun SettingsScreenContent(
     activeTheme: String,
     activeScheme: String,
+    activeInterval: Int,
     onThemeChange: (String) -> Unit,
     onSchemeChange: (String) -> Unit,
+    onIntervalChange: (Int) -> Unit,
     onExportJson: (java.io.OutputStream) -> Boolean,
     onExportDb: (java.io.OutputStream) -> Boolean,
     onImportBackup: (java.io.InputStream, (Boolean, isDb: Boolean) -> Unit) -> Unit
@@ -293,6 +298,85 @@ fun SettingsScreenContent(
             }
         }
 
+        // Reminder Settings Container
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Reminder Settings",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Reminder Repeat Interval",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Set how many minutes the alarm waits to repeat itself (applied to all repeat intervals).",
+                        fontSize = AppFontSizes.small,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        lineHeight = AppFontSizes.medium
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val intervals = listOf(
+                            Pair(5, "5m"),
+                            Pair(10, "10m"),
+                            Pair(15, "15m"),
+                            Pair(30, "30m"),
+                            Pair(60, "60m")
+                        )
+
+                        intervals.forEach { (minutes, label) ->
+                            val isSelected = activeInterval == minutes
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer 
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { onIntervalChange(minutes) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = AppFontSizes.small,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer 
+                                            else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Backups & Exports Container
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -425,8 +509,10 @@ fun SettingsScreenPreview() {
         SettingsScreenContent(
             activeTheme = "light",
             activeScheme = "minimal",
+            activeInterval = 10,
             onThemeChange = {},
             onSchemeChange = {},
+            onIntervalChange = {},
             onExportJson = { true },
             onExportDb = { true },
             onImportBackup = { _, _ -> }

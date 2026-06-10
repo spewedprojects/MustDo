@@ -19,5 +19,7 @@ data class Task(
     val isCompleted: Boolean = false,
     val reminderTime: Long? = null, // Millisecond timestamp for the notification alarm, or null
     val isRecurring: Boolean = false, // If true, replicates to future dates or adds automatically
-    val createdSeq: Long = System.currentTimeMillis() // Sequence representing addition time/sequence
+    val createdSeq: Long = System.currentTimeMillis(), // Sequence representing addition time/sequence
+    val repeatCount: Int = 1, // Repeating count from 1x to 4x (default 1)
+    val repeatedTimes: Int = 0 // Number of repeating alerts completed
 )
