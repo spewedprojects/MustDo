@@ -110,3 +110,9 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
 
 **_All the above tasks were marked done on 10/06/2026 2240hrs_**
 *********
+
+# TODO #5:
+
+### 1. Task:
+  - Add option for sub-tasks.
+  - Add option for category.

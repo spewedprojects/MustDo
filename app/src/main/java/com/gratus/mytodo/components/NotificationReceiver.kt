@@ -173,7 +173,7 @@ class NotificationReceiver : BroadcastReceiver() {
         }
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.icon_v3)
+            .setSmallIcon(R.drawable.icon_v3_notif)
             .setContentTitle("Reminder: ${task.title}")
             .setContentText("$priorityText - ${task.description}")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="black">#FFFFFFFF</color>
+    <color name="white">#FF000000</color>
     <!-- Widget Colors Dark Mode -->
     <color name="widget_container_bg">#0F172A</color>
     <color name="widget_container_stroke">#334155</color>

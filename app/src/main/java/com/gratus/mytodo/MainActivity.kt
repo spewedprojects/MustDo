@@ -190,13 +190,13 @@ fun MainLayoutContent(
                 modifier = Modifier
                     .width(300.dp)
                     .testTag("nav_drawer_sheet"),
-                drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+                drawerShape = RoundedCornerShape(topEnd = 18.dp, bottomEnd = 18.dp),
                 drawerContainerColor = if (colorSchemeType == "minimal" || colorSchemeType == "colorful") {
                     MaterialTheme.colorScheme.background
                 } else {
                     MaterialTheme.colorScheme.surface
                 },
-                drawerTonalElevation = 4.dp
+                drawerTonalElevation = 0.dp
             ) {
                 Spacer(modifier = Modifier.height(28.dp))
                 // Drawer logo / branding

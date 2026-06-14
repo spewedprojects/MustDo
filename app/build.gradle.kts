@@ -14,8 +14,8 @@ android {
     applicationId = "com.gratus.mytodo"
     minSdk = 24
     targetSdk = 36
-    versionCode = 7
-    versionName = "4.0.0"
+    versionCode = 8
+    versionName = "4.0.1"
 
     // Pass versionName to the app as a resource
     resValue(
