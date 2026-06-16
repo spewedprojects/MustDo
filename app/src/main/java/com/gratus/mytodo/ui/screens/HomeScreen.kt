@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.CopiedTask
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.components.TaskAddDialog
 import com.gratus.mytodo.ui.components.parseStyledDescription
@@ -60,6 +61,7 @@ fun HomeScreen(
     val taskToDelete by viewModel.taskToDelete.collectAsState()
     val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
+    val copiedTask by viewModel.copiedTask.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
@@ -70,6 +72,7 @@ fun HomeScreen(
         taskToDelete = taskToDelete,
         isAlarmPermissionGranted = isAlarmGranted,
         isNotificationPermissionGranted = isNotificationGranted,
+        copiedTask = copiedTask,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -83,6 +86,7 @@ fun HomeScreen(
         onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount ->
             viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount)
         },
+        onCopy = { viewModel.setCopiedTask(it) },
         getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) }
     )
 }
@@ -100,6 +104,7 @@ fun HomeScreenContent(
     taskToDelete: Task?,
     isAlarmPermissionGranted: Boolean,
     isNotificationPermissionGranted: Boolean,
+    copiedTask: CopiedTask?,
     onShowAddDialogChange: (Boolean) -> Unit,
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -109,6 +114,7 @@ fun HomeScreenContent(
     onDeleteTask: (Task) -> Unit,
     onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int) -> Unit,
     onEditTask: (Task, String, String, Int, Calendar, Long?, Int) -> Unit,
+    onCopy: (CopiedTask) -> Unit,
     getTasksForDate: (String) -> Flow<List<Task>>
 ) {
     val context = LocalContext.current
@@ -370,18 +376,70 @@ fun HomeScreenContent(
             }
         }
 
-        // Quick Add Floating Button
-        FloatingActionButton(
-            onClick = { onShowAddDialogChange(true) },
+        // Floating Action Buttons (Add Task and optional Paste Task)
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .testTag("quick_add_fab"),
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+                .padding(16.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(imageVector = Icons.Default.Add, contentDescription = "Add Task")
+            AnimatedVisibility(
+                visible = !DateTimeUtils.isToday(currentDate) && copiedTask != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        copiedTask?.let { copied ->
+                            val newReminderTime = copied.reminderTime?.let { origTime ->
+                                val origCal = Calendar.getInstance().apply { timeInMillis = origTime }
+                                val targetCal = Calendar.getInstance().apply {
+                                    time = currentDate.time
+                                    set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
+                                    set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                targetCal.timeInMillis
+                            }
+                            onAddTask(
+                                copied.title,
+                                copied.description,
+                                copied.priority,
+                                currentDate,
+                                emptyList(),
+                                0,
+                                newReminderTime,
+                                copied.repeatCount
+                            )
+                            Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("paste_task_fab"),
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentPaste,
+                        contentDescription = "Paste Task",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            FloatingActionButton(
+                onClick = { onShowAddDialogChange(true) },
+                modifier = Modifier.testTag("quick_add_fab"),
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Task")
+            }
         }
     }
 
@@ -395,7 +453,9 @@ fun HomeScreenContent(
                 onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount)
                 onShowAddDialogChange(false)
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
-            }
+            },
+            copiedTask = copiedTask,
+            onCopy = onCopy
         )
     }
 
@@ -412,7 +472,9 @@ fun HomeScreenContent(
                 onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
-            }
+            },
+            copiedTask = copiedTask,
+            onCopy = onCopy
         )
     }
 
@@ -691,6 +753,7 @@ fun HomeScreenMinimalPreview() {
             taskToDelete = null,
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
+            copiedTask = null,
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},
@@ -700,6 +763,7 @@ fun HomeScreenMinimalPreview() {
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _ -> },
             onEditTask = { _, _, _, _, _, _, _ -> },
+            onCopy = {},
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
@@ -718,6 +782,7 @@ fun HomeScreenSimplePreview() {
             taskToDelete = null,
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
+            copiedTask = null,
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},
@@ -727,6 +792,7 @@ fun HomeScreenSimplePreview() {
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _ -> },
             onEditTask = { _, _, _, _, _, _, _ -> },
+            onCopy = {},
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }

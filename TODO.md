@@ -115,4 +115,10 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
 
 ### 1. Task:
   - Add option for sub-tasks.
-  - Add option for category.
+  - Add option for category. Via tags.
+  - Copy/paste actions: - (DONE - 16/06/2026)
+    - Show "Copy" button only when editing a task, in the same row as Footer actions, on left. Show "Paste" button only when adding a new task in the same place as mentioned for "Copy" button. - (DONE)
+    - Show "Paste" button (with icon) as a floating button next to or above the add task floating action button on screens except "Today". This will basically paste the copied task to this new date. - (DONE)
+
+### 2. Home screen: - (DONE - 16/06/2026)
+  - Just as "Today" is visible to today's date. Make it so that "Yesterday" and "Tomorrow" for the respective dates. - (DONE)

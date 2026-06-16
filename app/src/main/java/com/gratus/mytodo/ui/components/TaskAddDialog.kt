@@ -37,11 +37,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.CopiedTask
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.ui.text.style.TextAlign
 import java.util.*
@@ -65,7 +67,9 @@ fun TaskAddDialog(
         reminderTimeMillis: Long?,
         repeatCount: Int
     ) -> Unit,
-    taskToEdit: Task? = null
+    taskToEdit: Task? = null,
+    copiedTask: CopiedTask? = null,
+    onCopy: ((CopiedTask) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -446,10 +450,11 @@ fun TaskAddDialog(
                                 }
                                 
                                 // Separator line
-                                Divider(
+                                HorizontalDivider(
                                     modifier = Modifier
                                         .height(20.dp)
                                         .width(1.dp),
+                                    thickness = DividerDefaults.Thickness,
                                     color = MaterialTheme.colorScheme.primary
                                 )
 
@@ -633,9 +638,76 @@ fun TaskAddDialog(
                 // Footer Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (taskToEdit != null) {
+                        TextButton(
+                            onClick = {
+                                onCopy?.invoke(
+                                    CopiedTask(
+                                        title = title,
+                                        description = descriptionValue.text,
+                                        priority = priority,
+                                        reminderTime = reminderTimestamp,
+                                        repeatCount = repeatCount
+                                    )
+                                )
+                                Toast.makeText(context, "Task copied!", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy Task",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text("Copy")
+                            }
+                        }
+                    } else if (copiedTask != null) {
+                        TextButton(
+                            onClick = {
+                                title = copiedTask.title
+                                descriptionValue = TextFieldValue(copiedTask.description)
+                                priority = copiedTask.priority
+                                reminderTimestamp = copiedTask.reminderTime?.let { origTime ->
+                                    val origCal = Calendar.getInstance().apply { timeInMillis = origTime }
+                                    val targetCal = Calendar.getInstance().apply {
+                                        time = initialDate.time
+                                        set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
+                                        set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }
+                                    targetCal.timeInMillis
+                                }
+                                repeatCount = copiedTask.repeatCount
+                                Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentPaste,
+                                    contentDescription = "Paste Task",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text("Paste")
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Cancel & Confirm buttons
                     TextButton(onClick = onDismiss) {
                         Text("Cancel")
                     }

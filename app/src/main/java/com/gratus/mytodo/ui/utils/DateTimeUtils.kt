@@ -96,4 +96,19 @@ object DateTimeUtils {
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
+
+    fun isToday(calendar: Calendar): Boolean {
+        return isSameDay(calendar, Calendar.getInstance())
+    }
+
+    fun isYesterday(calendar: Calendar): Boolean {
+        val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        return isSameDay(calendar, yesterday)
+    }
+
+    fun isTomorrow(calendar: Calendar): Boolean {
+        val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
+        return isSameDay(calendar, tomorrow)
+    }
 }
+

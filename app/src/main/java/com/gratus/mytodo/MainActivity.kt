@@ -301,10 +301,11 @@ fun MainLayoutContent(
                                         )
                                     }
                                     
-                                    val headerText = if (DateTimeUtils.isSameDay(focusDate, java.util.Calendar.getInstance())) {
-                                        "Today"
-                                    } else {
-                                        DateTimeUtils.formatMainHeader(focusDate)
+                                    val headerText = when {
+                                        DateTimeUtils.isToday(focusDate) -> "Today"
+                                        DateTimeUtils.isYesterday(focusDate) -> "Yesterday"
+                                        DateTimeUtils.isTomorrow(focusDate) -> "Tomorrow"
+                                        else -> DateTimeUtils.formatMainHeader(focusDate)
                                     }
                                     Text(
                                         text = headerText,

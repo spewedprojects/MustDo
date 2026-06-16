@@ -25,3 +25,15 @@ data class Task(
     val isReminderActive: Boolean = true, // If false, the reminder alerts are suspended for the task
     val nextReminderTime: Long? = null // Millisecond timestamp for the next repeating alarm, or null
 )
+
+/**
+ * Data class representing a copy of a Task's key fields for the copy-paste action.
+ */
+data class CopiedTask(
+    val title: String,
+    val description: String,
+    val priority: Int = 1,
+    val reminderTime: Long? = null,
+    val repeatCount: Int = 1
+)
+

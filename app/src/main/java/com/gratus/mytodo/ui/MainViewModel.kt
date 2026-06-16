@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gratus.mytodo.components.NotificationReceiver
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.CopiedTask
 import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.data.TaskRepository
 import kotlinx.coroutines.Dispatchers
@@ -135,6 +136,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _taskToDelete = MutableStateFlow<Task?>(null)
     val taskToDelete: StateFlow<Task?> = _taskToDelete.asStateFlow()
+
+    private val _copiedTask = MutableStateFlow<CopiedTask?>(null)
+    val copiedTask: StateFlow<CopiedTask?> = _copiedTask.asStateFlow()
+
+    fun setCopiedTask(task: CopiedTask?) {
+        _copiedTask.value = task
+    }
 
     fun setShowAddDialog(show: Boolean) {
         _showAddDialog.value = show
