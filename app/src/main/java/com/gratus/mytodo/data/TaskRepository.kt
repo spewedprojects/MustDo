@@ -31,4 +31,6 @@ class TaskRepository(private val taskDao: TaskDao) {
     suspend fun getTasksForDateDirect(date: String): List<Task> = taskDao.getTasksForDateDirect(date)
 
     suspend fun insertTasks(tasks: List<Task>) = taskDao.insertTasks(tasks)
+
+    suspend fun removeCategoryFromTasks(category: String) = taskDao.removeCategoryFromTasks(category)
 }

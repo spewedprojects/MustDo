@@ -1,6 +1,7 @@
 package com.gratus.mytodo.data.utils
 
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.SubTask
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -29,6 +30,15 @@ object BackupHelper {
                 put("repeatedTimes", task.repeatedTimes)
                 put("isReminderActive", task.isReminderActive)
                 put("nextReminderTime", task.nextReminderTime ?: JSONObject.NULL)
+                put("category", task.category ?: JSONObject.NULL)
+                put("subTasks", JSONArray().apply {
+                    task.subTasks.forEach { sub ->
+                        put(JSONObject().apply {
+                            put("title", sub.title)
+                            put("isCompleted", sub.isCompleted)
+                        })
+                    }
+                })
             }
             arr.put(obj)
         }
@@ -45,6 +55,20 @@ object BackupHelper {
             val obj = arr.getJSONObject(i)
             val reminderTime = if (obj.isNull("reminderTime")) null else obj.getLong("reminderTime")
             val nextReminderTime = if (obj.has("nextReminderTime") && !obj.isNull("nextReminderTime")) obj.getLong("nextReminderTime") else null
+            
+            val category = if (obj.has("category") && !obj.isNull("category")) obj.getString("category") else null
+            val subTasksList = ArrayList<SubTask>()
+            if (obj.has("subTasks")) {
+                val subArr = obj.getJSONArray("subTasks")
+                for (j in 0 until subArr.length()) {
+                    val subObj = subArr.getJSONObject(j)
+                    subTasksList.add(SubTask(
+                        title = subObj.getString("title"),
+                        isCompleted = if (subObj.has("isCompleted")) subObj.getBoolean("isCompleted") else false
+                    ))
+                }
+            }
+
             val task = Task(
                 id = if (obj.has("id")) obj.getInt("id") else 0,
                 title = obj.getString("title"),
@@ -58,7 +82,9 @@ object BackupHelper {
                 repeatCount = if (obj.has("repeatCount")) obj.getInt("repeatCount") else 1,
                 repeatedTimes = if (obj.has("repeatedTimes")) obj.getInt("repeatedTimes") else 0,
                 isReminderActive = if (obj.has("isReminderActive")) obj.getBoolean("isReminderActive") else true,
-                nextReminderTime = nextReminderTime ?: reminderTime
+                nextReminderTime = nextReminderTime ?: reminderTime,
+                subTasks = subTasksList,
+                category = category
             )
             tasks.add(task)
         }

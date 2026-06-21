@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.gratus.mytodo.components.NotificationReceiver
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.CopiedTask
+import com.gratus.mytodo.data.SubTask
 import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.data.TaskRepository
 import kotlinx.coroutines.Dispatchers
@@ -95,6 +96,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setReminderInterval(minutes: Int) {
         _settingsReminderInterval.value = minutes
         sharedPrefs.edit().putInt("reminder_repeat_interval", minutes).apply()
+    }
+
+    // Category / Tag Management
+    private val defaultCategories = listOf("Personal", "Work", "Errands", "Health", "Learning")
+    private val _customCategories = MutableStateFlow<List<String>>(
+        sharedPrefs.getStringSet("custom_categories", emptySet())?.toList()?.sorted() ?: emptyList()
+    )
+    val customCategories: StateFlow<List<String>> = _customCategories.asStateFlow()
+
+    val categories: StateFlow<List<String>> = _customCategories
+        .map { custom -> (defaultCategories + custom).distinct() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, defaultCategories)
+
+    fun addCustomCategory(category: String) {
+        val trimmed = category.trim()
+        if (trimmed.isEmpty()) return
+        val current = _customCategories.value.toMutableList()
+        if (!current.contains(trimmed) && !defaultCategories.contains(trimmed)) {
+            current.add(trimmed)
+            current.sort()
+            _customCategories.value = current
+            sharedPrefs.edit().putStringSet("custom_categories", current.toSet()).apply()
+        }
+    }
+
+    fun deleteCustomCategory(category: String) {
+        val current = _customCategories.value.toMutableList()
+        if (current.remove(category)) {
+            _customCategories.value = current
+            sharedPrefs.edit().putStringSet("custom_categories", current.toSet()).apply()
+            
+            // Clean up DB references
+            viewModelScope.launch {
+                repository.removeCategoryFromTasks(category)
+                updateWidget()
+            }
+        }
     }
 
     private val _isAlarmPermissionGranted = MutableStateFlow(true)
@@ -289,7 +327,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         replicateDates: List<String>, // yyyy-MM-dd format future copies
         everydayDaysCount: Int = 0, // if everyday is checked, range of next everyday copies
         reminderTimeMillis: Long? = null,
-        repeatCount: Int = 1
+        repeatCount: Int = 1,
+        subTasks: List<SubTask> = emptyList(),
+        category: String? = null
     ) {
         viewModelScope.launch {
             val dateStr = DateTimeUtils.formatDbDate(targetDate)
@@ -304,7 +344,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 repeatCount = repeatCount,
                 repeatedTimes = 0,
                 isReminderActive = true,
-                nextReminderTime = reminderTimeMillis
+                nextReminderTime = reminderTimeMillis,
+                subTasks = subTasks,
+                category = category
             )
 
             // Save last used priority
@@ -349,7 +391,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun toggleCompleted(task: Task) {
         viewModelScope.launch {
-            val updated = task.copy(isCompleted = !task.isCompleted)
+            val newCompleted = !task.isCompleted
+            val updatedSubTasks = task.subTasks.map { it.copy(isCompleted = newCompleted) }
+            val updated = task.copy(
+                isCompleted = newCompleted,
+                subTasks = updatedSubTasks
+            )
             val updatedWithReset = if (!updated.isCompleted) {
                 updated.copy(repeatedTimes = 0, isReminderActive = true, nextReminderTime = updated.reminderTime)
             } else {
@@ -368,7 +415,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Update task details (title, description, priority, date, alarm/reminder).
+     * Update task details (title, description, priority, date, alarm/reminder, subtasks, category).
      */
     fun updateTaskFields(
         id: Int,
@@ -377,7 +424,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         priority: Int,
         targetDate: Calendar,
         reminderTimeMillis: Long? = null,
-        repeatCount: Int = 1
+        repeatCount: Int = 1,
+        subTasks: List<SubTask> = emptyList(),
+        category: String? = null
     ) {
         viewModelScope.launch {
             val original = repository.getTaskById(id) ?: return@launch
@@ -386,6 +435,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             cancelReminder(original)
 
             val dateStr = DateTimeUtils.formatDbDate(targetDate)
+            
+            // If all subtasks are complete, automatically mark the main task as complete
+            val allCompleted = subTasks.isNotEmpty() && subTasks.all { it.isCompleted }
+            val isMainCompleted = if (allCompleted) true else (if (original.isCompleted && !allCompleted) false else original.isCompleted)
+
             val updated = original.copy(
                 title = title,
                 description = description,
@@ -395,7 +449,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 repeatCount = repeatCount,
                 repeatedTimes = 0,
                 isReminderActive = true,
-                nextReminderTime = reminderTimeMillis
+                nextReminderTime = reminderTimeMillis,
+                subTasks = subTasks,
+                category = category,
+                isCompleted = isMainCompleted
             )
             
             repository.updateTask(updated)
@@ -404,6 +461,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!updated.isCompleted && reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
                 scheduleExactReminder(updated)
             }
+            updateWidget()
+        }
+    }
+
+    /**
+     * Toggle a specific subtask's completion status.
+     */
+    fun toggleSubTaskCompleted(task: Task, subTaskIndex: Int) {
+        viewModelScope.launch {
+            val updatedSubTasks = task.subTasks.mapIndexed { index, sub ->
+                if (index == subTaskIndex) sub.copy(isCompleted = !sub.isCompleted) else sub
+            }
+            val allCompleted = updatedSubTasks.isNotEmpty() && updatedSubTasks.all { it.isCompleted }
+            val isMainCompleted = if (allCompleted) true else (if (task.isCompleted && !allCompleted) false else task.isCompleted)
+
+            val updatedTask = task.copy(
+                subTasks = updatedSubTasks,
+                isCompleted = isMainCompleted
+            )
+            repository.updateTask(updatedTask)
+            
+            // Handle reminders sync if status changed
+            if (updatedTask.isCompleted) {
+                cancelReminder(updatedTask)
+            } else if (updatedTask.reminderTime != null && updatedTask.reminderTime > System.currentTimeMillis()) {
+                scheduleExactReminder(updatedTask)
+            }
+
             updateWidget()
         }
     }

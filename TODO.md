@@ -114,11 +114,39 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
 # TODO #5:
 
 ### 1. Task:
-  - Add option for sub-tasks.
-  - Add option for category. Via tags.
+  - Add option for sub-tasks. - (DONE - 21/06/2026)
+  - Add option for category. Via tags. -  Category wise groups will be visible on main screen. - (DONE - 21/06/2026)
+  - _**Broad Directions for subtasks and category:**_
+    - **Task Item:**
+      - Group Tasks into Large Category Cards like we currently have for singular task item.
+      - On left, colored (according to color scheme) category icon; next to it, category/tag label; on right,number of tasks in the category and on right of this - a dropdown button to collapse/expand the category. It can more or less look like this: `[icon] Personal       [2]   ▼`
+      - Tasks shall look exactly like they do right now, with sub-tasks (if present) shall be displayed as nested list items but below the description (if any). These sub-tasks shall have their own check/uncheck icon like what we have for widget, while the main task will retain existing check/uncheck icons without changes.
+      - If all subtasks are marked checked, the main task will automatically be checked. This shall follow the existing method to indicate the same - strikethrough and gray/monochrome indicating disabled.
+    - **Add task dialog:**
+      - **Category:**
+        - Two column layout at the place of priority section. On left, will be existing priority selection; and on right, will be Category selection.
+        - Add 3-5 inbuilt categories/tags (Errands, Work, Personal, Health, Learning, etc.) and add the ability to add a custom category/tag via "+" button. The icons for these tags/categories shall be used from an existing pool of icons - for custom tag/category, if the keywords are matching a known category give it that icon and if not, use generic tag icon.
+        - The tags/category chips shall also be colored (according to color scheme and should match with color on task item list) and should have a "X" button to basically delete the tag/category.
+      - **Sub-tasks:**
+        - Below Priority/Category, a card appearance will be there (or without card, if ti doesn't fit the aesthetic):
+        - > `Sub-tasks                     0/3`
+        - > ` Research options          X`
+        - > ` Compare & shortlist       X`
+        - > ` Make decision             X`
+        - `+ Add sub-task`
+    - If a task is added without assigning it a certain category, display it on main screen like current behavior. - (DONE - 21/06/2026)
+    - This would require addition of column/s for tasks table, yes. But assess whether you need to add a new table to database to store categories. - (DONE - 21/06/2026)
+    - All these new changes shall also be visible for task edit dialog. - (DONE - 21/06/2026)
+    - Copy/Paste shall also include these new additions. - (DONE - 21/06/2026)
+
   - Copy/paste actions: - (DONE - 16/06/2026)
     - Show "Copy" button only when editing a task, in the same row as Footer actions, on left. Show "Paste" button only when adding a new task in the same place as mentioned for "Copy" button. - (DONE)
     - Show "Paste" button (with icon) as a floating button next to or above the add task floating action button on screens except "Today". This will basically paste the copied task to this new date. - (DONE)
 
 ### 2. Home screen: - (DONE - 16/06/2026)
   - Just as "Today" is visible to today's date. Make it so that "Yesterday" and "Tomorrow" for the respective dates. - (DONE)
+
+### 3. Notification:
+  - Add new button to notification - "Snooze". Hitting snooze will pop up system dialog that asks the duration (5/10/15/30mins).
+  - The snooze function is different from the existing "Stop" and "Mark Complete" functions. Snooze will basically pause the reminder system for the selected duration, on resuming, the repetition of the reminder will continue at its own set duration.
+  - This duration can be written to prefs file only, no need to write it to the database since it will carry no meaning.

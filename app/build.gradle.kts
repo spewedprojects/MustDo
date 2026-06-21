@@ -14,8 +14,8 @@ android {
     applicationId = "com.gratus.mytodo"
     minSdk = 24
     targetSdk = 36
-    versionCode = 9
-    versionName = "4.1.0"
+    versionCode = 10
+    versionName = "5.0.0"
 
     // Pass versionName to the app as a resource
     resValue(
@@ -55,8 +55,8 @@ android {
 //    }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_19
+    targetCompatibility = JavaVersion.VERSION_19
   }
   buildFeatures {
     compose = true
@@ -128,4 +128,7 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+
+  // Rounded checkbox implementation
+  //implementation("com.github.kosher9:Compose-Round-CheckBox:Tag")
 }

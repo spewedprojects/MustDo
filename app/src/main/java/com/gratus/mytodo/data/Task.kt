@@ -2,6 +2,16 @@ package com.gratus.mytodo.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.squareup.moshi.JsonClass
+
+/**
+ * Data class representing a sub-task item.
+ */
+@JsonClass(generateAdapter = true)
+data class SubTask(
+    val title: String,
+    val isCompleted: Boolean = false
+)
 
 /**
  * Entity representing a To-Do Task in the Room database.
@@ -23,7 +33,9 @@ data class Task(
     val repeatCount: Int = 1, // Repeating count from 1x to 4x (default 1)
     val repeatedTimes: Int = 0, // Number of repeating alerts completed
     val isReminderActive: Boolean = true, // If false, the reminder alerts are suspended for the task
-    val nextReminderTime: Long? = null // Millisecond timestamp for the next repeating alarm, or null
+    val nextReminderTime: Long? = null, // Millisecond timestamp for the next repeating alarm, or null
+    val subTasks: List<SubTask> = emptyList(), // JSON serialized list of sub-tasks
+    val category: String? = null // Nullable category tag (e.g. Work, Personal)
 )
 
 /**
@@ -34,6 +46,7 @@ data class CopiedTask(
     val description: String,
     val priority: Int = 1,
     val reminderTime: Long? = null,
-    val repeatCount: Int = 1
+    val repeatCount: Int = 1,
+    val subTasks: List<SubTask> = emptyList(),
+    val category: String? = null
 )
-

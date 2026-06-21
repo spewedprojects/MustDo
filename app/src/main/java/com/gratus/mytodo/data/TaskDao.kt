@@ -40,4 +40,7 @@ interface TaskDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTasks(tasks: List<Task>)
+
+    @Query("UPDATE tasks SET category = NULL WHERE category = :category")
+    suspend fun removeCategoryFromTasks(category: String)
 }

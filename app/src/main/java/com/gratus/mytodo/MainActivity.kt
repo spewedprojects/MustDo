@@ -1,9 +1,12 @@
 package com.gratus.mytodo
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.ImageButton
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +15,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,6 +51,7 @@ import kotlinx.coroutines.launch
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.*
 import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 
 /**
  * MainActivity is the host core of the Soft To-Do application.
@@ -186,92 +192,12 @@ fun MainLayoutContent(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                modifier = Modifier
-                    .width(300.dp)
-                    .testTag("nav_drawer_sheet"),
-                drawerShape = RoundedCornerShape(topEnd = 18.dp, bottomEnd = 18.dp),
-                drawerContainerColor = if (colorSchemeType == "minimal" || colorSchemeType == "colorful") {
-                    MaterialTheme.colorScheme.background
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
-                drawerTonalElevation = 0.dp
-            ) {
-                Spacer(modifier = Modifier.height(28.dp))
-                // Drawer logo / branding
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "MustDo",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = (0.5).sp
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Time-locked task tracker",
-                        fontSize = AppFontSizes.extraSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-                Divider(
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Navigation Items
-                val navItems = listOf(
-                    Triple(Screen.HOME, "Home", Icons.Default.Home),
-                    Triple(Screen.HISTORY, "History Records", Icons.Default.History),
-                    Triple(Screen.STATS, "Stats Analyzer", Icons.Default.Analytics),
-                    Triple(Screen.SETTINGS, "App Settings", Icons.Default.Settings)
-                )
-
-                navItems.forEach { (screenKey, name, icon) ->
-                    val isSelected = activeScreen == screenKey
-                    NavigationDrawerItem(
-                        icon = { Icon(imageVector = icon, contentDescription = name) },
-                        label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
-                        selected = isSelected,
-                        onClick = {
-                            onSetActiveScreen(screenKey)
-                            coroutineScope.launch { drawerState.close() }
-                        },
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp, vertical = 2.dp)
-                            .testTag("drawer_item_${screenKey.name.lowercase()}"),
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            unselectedContainerColor = Color.Transparent,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Fine signature branding in drawer footer
-                Text(
-                    text = stringResource(R.string.app_version),
-                    fontSize = AppFontSizes.micro,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
+            AppDrawerContent(
+                activeScreen = activeScreen,
+                colorSchemeType = colorSchemeType,
+                onSetActiveScreen = onSetActiveScreen,
+                onCloseDrawer = { coroutineScope.launch { drawerState.close() } }
+            )
         }
     ) {
         FaintBackground(colorSchemeType = colorSchemeType) {
@@ -392,6 +318,113 @@ fun MainLayoutContent(
     }
 }
 
+@Composable
+fun AppDrawerContent(
+    activeScreen: Screen,
+    colorSchemeType: String,
+    onSetActiveScreen: (Screen) -> Unit,
+    onCloseDrawer: () -> Unit
+) {
+    val context = LocalContext.current
+
+    ModalDrawerSheet(
+        modifier = Modifier
+            .width(300.dp)
+            .testTag("nav_drawer_sheet"),
+        drawerShape = RoundedCornerShape(topEnd = 18.dp, bottomEnd = 18.dp),
+        drawerContainerColor = if (colorSchemeType == "minimal" || colorSchemeType == "colorful") {
+            MaterialTheme.colorScheme.background
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        drawerTonalElevation = 0.dp
+    ) {
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Branding
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = "MustDo",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = (0.5).sp
+                ),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Time-locked task tracker",
+                fontSize = AppFontSizes.extraSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+        Divider(
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Navigation Items
+        val navItems = listOf(
+            Triple(Screen.HOME, "Home", Icons.Default.Home),
+            Triple(Screen.HISTORY, "History Records", Icons.Default.History),
+            Triple(Screen.STATS, "Stats Analyzer", Icons.Default.Analytics),
+            Triple(Screen.SETTINGS, "App Settings", Icons.Default.Settings)
+        )
+
+        navItems.forEach { (screenKey, name, icon) ->
+            NavigationDrawerItem(
+                icon = { Icon(imageVector = icon, contentDescription = name) },
+                label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
+                selected = activeScreen == screenKey,
+                onClick = {
+                    onSetActiveScreen(screenKey)
+                    onCloseDrawer()
+                },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                colors = NavigationDrawerItemDefaults.colors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedContainerColor = Color.Transparent
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // GitHub Button
+        IconButton(
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW,"https://github.com/spewedprojects/MustDo".toUri())
+                context.startActivity(intent)
+            },
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 8.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.github_mark),
+                contentDescription = "Star on GitHub",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp) // Adjusted to a more standard size
+            )
+        }
+
+        // Version Info
+        Text(
+            text = stringResource(R.string.app_version),
+            fontSize = AppFontSizes.micro,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun MainLayoutPreview() {
@@ -409,6 +442,20 @@ fun MainLayoutPreview() {
                     Text("Main Layout Preview Content")
                 }
             }
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun NavDrawerPreview() {
+    SoftTodoTheme {
+        // We call the shared content directly
+        AppDrawerContent(
+            activeScreen = Screen.HOME,
+            colorSchemeType = "minimal",
+            onSetActiveScreen = {},
+            onCloseDrawer = {}
         )
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -36,8 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.CopiedTask
+import com.gratus.mytodo.data.SubTask
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.components.TaskAddDialog
+import com.gratus.mytodo.ui.components.getCategoryIcon
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
@@ -62,6 +65,7 @@ fun HomeScreen(
     val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
     val copiedTask by viewModel.copiedTask.collectAsState()
+    val customCategories by viewModel.customCategories.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
@@ -73,6 +77,7 @@ fun HomeScreen(
         isAlarmPermissionGranted = isAlarmGranted,
         isNotificationPermissionGranted = isNotificationGranted,
         copiedTask = copiedTask,
+        customCategories = customCategories,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -80,13 +85,16 @@ fun HomeScreen(
         onSetDate = { viewModel.setDate(it) },
         onToggleComplete = { viewModel.toggleCompleted(it) },
         onDeleteTask = { viewModel.deleteTask(it) },
-        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount ->
-            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount)
+        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category ->
+            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category)
         },
-        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount ->
-            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount)
+        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category ->
+            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category)
         },
         onCopy = { viewModel.setCopiedTask(it) },
+        onAddCustomCategory = { viewModel.addCustomCategory(it) },
+        onDeleteCustomCategory = { viewModel.deleteCustomCategory(it) },
+        onToggleSubComplete = { task, index -> viewModel.toggleSubTaskCompleted(task, index) },
         getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) }
     )
 }
@@ -105,6 +113,7 @@ fun HomeScreenContent(
     isAlarmPermissionGranted: Boolean,
     isNotificationPermissionGranted: Boolean,
     copiedTask: CopiedTask?,
+    customCategories: List<String>,
     onShowAddDialogChange: (Boolean) -> Unit,
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -112,12 +121,16 @@ fun HomeScreenContent(
     onSetDate: (Calendar) -> Unit,
     onToggleComplete: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
-    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?, Int) -> Unit,
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?) -> Unit,
     onCopy: (CopiedTask) -> Unit,
+    onAddCustomCategory: (String) -> Unit,
+    onDeleteCustomCategory: (String) -> Unit,
+    onToggleSubComplete: (Task, Int) -> Unit,
     getTasksForDate: (String) -> Flow<List<Task>>
 ) {
     val context = LocalContext.current
+    val preselectedCategory = remember { mutableStateOf<String?>(null) }
 
     // Smooth Sliding Pager setup
     val baseDate = remember { Calendar.getInstance() }
@@ -354,6 +367,17 @@ fun HomeScreenContent(
                             }
                         }
                     } else {
+                        val groupedTasks = remember(pageTasks) {
+                            pageTasks.groupBy { it.category }
+                        }
+                        val collapsedCategories = remember { mutableStateMapOf<String, Boolean>() }
+                        val categorized = remember(groupedTasks) {
+                            groupedTasks.filterKeys { it != null }.toSortedMap(compareBy { it!! })
+                        }
+                        val uncategorized = remember(groupedTasks) {
+                            groupedTasks[null] ?: emptyList()
+                        }
+
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -361,14 +385,59 @@ fun HomeScreenContent(
                             contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(pageTasks, key = { it.id }) { task ->
-                                 TaskItemCard(
-                                     task = task,
-                                     colorSchemeType = colorSchemeType,
-                                     onToggleComplete = { onToggleComplete(task) },
-                                     onDelete = { onTaskToDeleteChange(task) },
-                                     onLongClick = { onTaskToEditChange(task) }
-                                 )
+                            // 1. Categorized Tasks
+                            categorized.forEach { (category, tasks) ->
+                                val catName = category ?: ""
+                                val isCollapsed = collapsedCategories[catName] == true
+                                
+                                item(key = "category_card_$catName") {
+                                    CategoryCard(
+                                        category = catName,
+                                        tasks = tasks,
+                                        isExpanded = !isCollapsed,
+                                        onToggleExpand = {
+                                            collapsedCategories[catName] = !isCollapsed
+                                        },
+                                        onQuickAdd = {
+                                            preselectedCategory.value = catName
+                                            onShowAddDialogChange(true)
+                                        },
+                                        colorSchemeType = colorSchemeType
+                                    ) {
+                                        tasks.forEachIndexed { index, task ->
+                                            TaskItemCard(
+                                                task = task,
+                                                colorSchemeType = colorSchemeType,
+                                                isFlat = true,
+                                                onToggleComplete = { onToggleComplete(task) },
+                                                onDelete = { onTaskToDeleteChange(task) },
+                                                onLongClick = { onTaskToEditChange(task) },
+                                                onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
+                                            )
+                                            if (index < tasks.size - 1) {
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                                    thickness = 1.dp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 2. Uncategorized Tasks
+                            if (uncategorized.isNotEmpty()) {
+                                items(uncategorized, key = { "task_${it.id}" }) { task ->
+                                    TaskItemCard(
+                                        task = task,
+                                        colorSchemeType = colorSchemeType,
+                                        isFlat = false,
+                                        onToggleComplete = { onToggleComplete(task) },
+                                        onDelete = { onTaskToDeleteChange(task) },
+                                        onLongClick = { onTaskToEditChange(task) },
+                                        onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -403,16 +472,18 @@ fun HomeScreenContent(
                                 }
                                 targetCal.timeInMillis
                             }
-                            onAddTask(
-                                copied.title,
-                                copied.description,
-                                copied.priority,
-                                currentDate,
-                                emptyList(),
-                                0,
-                                newReminderTime,
-                                copied.repeatCount
-                            )
+                             onAddTask(
+                                 copied.title,
+                                 copied.description,
+                                 copied.priority,
+                                 currentDate,
+                                 emptyList(),
+                                 0,
+                                 newReminderTime,
+                                 copied.repeatCount,
+                                 copied.subTasks,
+                                 copied.category
+                             )
                             Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
                         }
                     },
@@ -448,14 +519,22 @@ fun HomeScreenContent(
         TaskAddDialog(
             initialDate = currentDate,
             lastUsedPriority = lastUsedPriority,
-            onDismiss = { onShowAddDialogChange(false) },
-            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount ->
-                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount)
+            onDismiss = {
                 onShowAddDialogChange(false)
+                preselectedCategory.value = null
+            },
+            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category ->
+                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category)
+                onShowAddDialogChange(false)
+                preselectedCategory.value = null
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
             },
+            preselectedCategory = preselectedCategory.value,
             copiedTask = copiedTask,
-            onCopy = onCopy
+            onCopy = onCopy,
+            customCategories = customCategories,
+            onAddCustomCategory = onAddCustomCategory,
+            onDeleteCustomCategory = onDeleteCustomCategory
         )
     }
 
@@ -468,13 +547,16 @@ fun HomeScreenContent(
             lastUsedPriority = lastUsedPriority,
             taskToEdit = taskToEdit,
             onDismiss = { onTaskToEditChange(null) },
-            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount ->
-                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount)
+            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount, subTasks, category ->
+                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
             },
             copiedTask = copiedTask,
-            onCopy = onCopy
+            onCopy = onCopy,
+            customCategories = customCategories,
+            onAddCustomCategory = onAddCustomCategory,
+            onDeleteCustomCategory = onDeleteCustomCategory
         )
     }
 
@@ -518,55 +600,159 @@ fun HomeScreenContent(
 /**
  * Task item card component.
  */
+/**
+ * Category group header card component.
+ */
+/**
+ * Resolves color coding accents matching default and custom category titles.
+ */
+fun getCategoryAccentColor(category: String): Color {
+    val lower = category.lowercase().trim()
+    return when {
+        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
+        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
+        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
+        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Color(0xFF9C27B0) // Purple
+        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Color(0xFFFF5722) // Orange
+        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Color(0xFFFFC107) // Amber/Yellow
+        else -> Color(0xFF673AB7) // Indigo/default
+    }
+}
+
+/**
+ * Category group header card containing nested task items (single card mockup pattern).
+ */
+@Composable
+fun CategoryCard(
+    category: String,
+    tasks: List<Task>,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onQuickAdd: () -> Unit,
+    colorSchemeType: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val isDark = MaterialTheme.colorScheme.background.red < 0.2f
+    val accentColor = getCategoryAccentColor(category)
+    val icon = getCategoryIcon(category)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .testTag("category_card_$category"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = when (colorSchemeType) {
+            "simple" -> androidx.compose.foundation.BorderStroke(
+                1.dp, 
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+            "minimal" -> androidx.compose.foundation.BorderStroke(
+                1.dp, 
+                if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder
+            )
+            "system" -> androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            )
+            else -> androidx.compose.foundation.BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggleExpand() }
+                    .padding(vertical = 14.dp, horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Text(
+                    text = category,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tasks.size.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = accentColor
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                IconButton(
+                    onClick = { onQuickAdd() },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Quick Add in Category",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            
+            if (isExpanded) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp
+                )
+                content()
+            }
+        }
+    }
+}
+
 @Composable
 fun TaskItemCard(
     task: Task,
     colorSchemeType: String,
+    isFlat: Boolean = false,
     onToggleComplete: () -> Unit,
     onDelete: () -> Unit,
-    onLongClick: () -> Unit
+    onLongClick: () -> Unit,
+    onToggleSubComplete: (Int) -> Unit
 ) {
     val isCompleted = task.isCompleted
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
     val context = LocalContext.current
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (isCompleted) 0.8f else 1.0f) // Greys out completely when marked completed
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                onClick = {}, // No action on single card tap to avoid checkmark interference
-                onLongClick = onLongClick
-            )
-            .testTag("task_item_${task.id}"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isCompleted) {
-                if (colorSchemeType == "minimal") {
-                    if (isDark) Color(0x15FFFFFF) else Color(0x33B0AAB9)
-                } else {
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                }
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        ),
-        border = when (colorSchemeType) {
-            "simple" -> borderStrokeSimple(isCompleted)
-            "minimal" -> {
-                if (isCompleted) {
-                    androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
-                } else {
-                    androidx.compose.foundation.BorderStroke(1.dp, if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder)
-                }
-            }
-            else -> null
-        },
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp
-        )
-    ) {
+    val content = @Composable {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -587,6 +773,7 @@ fun TaskItemCard(
                             Color.Transparent
                         }
                     )
+                    .align(Alignment.Top)
             ) {
                 if (isCompleted) {
                     Icon(
@@ -627,6 +814,51 @@ fun TaskItemCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (isCompleted) 0.5f else 0.8f)
                     )
+                }
+
+                if (task.subTasks.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        task.subTasks.forEachIndexed { index, subTask ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onToggleSubComplete(index) }
+                                    .padding(vertical = 2.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (subTask.isCompleted) {
+                                        Icons.Default.CheckBox
+                                    } else {
+                                        Icons.Default.CheckBoxOutlineBlank
+                                    },
+                                    contentDescription = "Toggle Subtask",
+                                    tint = if (subTask.isCompleted || isCompleted) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    } else {
+                                        MaterialTheme.colorScheme.outline
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = subTask.title,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        textDecoration = if (subTask.isCompleted || isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                                    ),
+                                    color = if (subTask.isCompleted || isCompleted) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Show Scheduled Alarm timestamp indicator
@@ -686,7 +918,8 @@ fun TaskItemCard(
                         1.dp,
                         badgeStyle.borderColor,
                         RoundedCornerShape(8.dp)
-                    ),
+                    )
+                    .align(Alignment.Top),
                 contentAlignment = Alignment.Center
             ) {
                  Text(
@@ -700,7 +933,9 @@ fun TaskItemCard(
             // Delete item button inside row
             IconButton(
                 onClick = onDelete,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier
+                    .size(36.dp)
+                    .align(Alignment.Top)
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
@@ -711,6 +946,62 @@ fun TaskItemCard(
             }
         }
     }
+
+    if (isFlat) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(if (isCompleted) 0.8f else 1.0f)
+                .pointerInput(onLongClick) {
+                    detectTapGestures(
+                        onLongPress = { _ -> onLongClick() }
+                    )
+                }
+        ) {
+            content()
+        }
+    } else {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .alpha(if (isCompleted) 0.8f else 1.0f)
+                .clip(RoundedCornerShape(16.dp))
+                .pointerInput(onLongClick) {
+                    detectTapGestures(
+                        onLongPress = { _ -> onLongClick() }
+                    )
+                }
+                .testTag("task_item_${task.id}"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isCompleted) {
+                    if (colorSchemeType == "minimal") {
+                        if (isDark) Color(0x15FFFFFF) else Color(0x33B0AAB9)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    }
+                } else {
+                    MaterialTheme.colorScheme.surface
+                }
+            ),
+            border = when (colorSchemeType) {
+                "simple" -> borderStrokeSimple(isCompleted)
+                "minimal" -> {
+                    if (isCompleted) {
+                        androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
+                    } else {
+                        androidx.compose.foundation.BorderStroke(1.dp, if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder)
+                    }
+                }
+                else -> null
+            },
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 0.dp
+            )
+        ) {
+            content()
+        }
+    }
 }
 
 /**
@@ -719,9 +1010,9 @@ fun TaskItemCard(
 @Composable
 fun borderStrokeSimple(isCompleted: Boolean): androidx.compose.foundation.BorderStroke {
     val color = if (isCompleted) {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     }
     return androidx.compose.foundation.BorderStroke(1.dp, color)
 }
@@ -754,6 +1045,7 @@ fun HomeScreenMinimalPreview() {
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
             copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},
@@ -761,9 +1053,12 @@ fun HomeScreenMinimalPreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
@@ -783,6 +1078,7 @@ fun HomeScreenSimplePreview() {
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
             copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
             onShowAddDialogChange = {},
             onTaskToEditChange = {},
             onTaskToDeleteChange = {},
@@ -790,9 +1086,12 @@ fun HomeScreenSimplePreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
             getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
@@ -807,13 +1106,44 @@ fun TaskItemCardPreview() {
             colorSchemeType = "colorful",
             onToggleComplete = {},
             onDelete = {},
-            onLongClick = {}
+            onLongClick = {},
+            onToggleSubComplete = {}
         )
     }
 }
 
 private val sampleTasks = listOf(
-    Task(id = 1, title = "Finish Project Proposal", description = "Finalize the budget and timeline", priority = 1, dateAdded = "2023-10-27", isCompleted = false),
-    Task(id = 2, title = "Grocery Shopping", description = "Milk, Eggs, Bread, Fruits", priority = 2, dateAdded = "2023-10-27", isCompleted = true),
-    Task(id = 3, title = "Gym Workout", description = "Leg day", priority = 3, dateAdded = "2023-10-27", isCompleted = false)
+    Task(
+        id = 1,
+        title = "Finish Project Proposal",
+        description = "Finalize the budget and timeline",
+        priority = 1,
+        dateAdded = "2023-10-27",
+        category = "Work",
+        subTasks = listOf(SubTask("Draft budget", true), SubTask("Set timeline", false))
+    ),
+    Task(
+        id = 2,
+        title = "Grocery Shopping",
+        description = "Milk, Eggs, Bread, Fruits",
+        priority = 2,
+        dateAdded = "2023-10-27",
+        isCompleted = true,
+        category = "Errands"
+    ),
+    Task(
+        id = 3,
+        title = "Gym Workout",
+        description = "Leg day",
+        priority = 3,
+        dateAdded = "2023-10-27",
+        category = "Fitness"
+    ),
+    Task(
+        id = 4,
+        title = "Walk the dog",
+        description = "Around the park",
+        priority = 4,
+        dateAdded = "2023-10-27"
+    )
 )

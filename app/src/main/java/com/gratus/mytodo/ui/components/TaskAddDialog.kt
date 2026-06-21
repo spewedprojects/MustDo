@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,9 +24,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
@@ -38,6 +44,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.CopiedTask
+import com.gratus.mytodo.data.SubTask
+import androidx.compose.ui.text.style.TextDecoration
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
@@ -65,11 +73,17 @@ fun TaskAddDialog(
         replicateDates: List<String>,
         everydayCount: Int,
         reminderTimeMillis: Long?,
-        repeatCount: Int
+        repeatCount: Int,
+        subTasks: List<SubTask>,
+        category: String?
     ) -> Unit,
     taskToEdit: Task? = null,
+    preselectedCategory: String? = null,
     copiedTask: CopiedTask? = null,
-    onCopy: ((CopiedTask) -> Unit)? = null
+    onCopy: ((CopiedTask) -> Unit)? = null,
+    customCategories: List<String> = emptyList(),
+    onAddCustomCategory: (String) -> Unit = {},
+    onDeleteCustomCategory: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -85,6 +99,10 @@ fun TaskAddDialog(
     // Alarm reminder state (timestamp milliseconds)
     var reminderTimestamp by rememberSaveable { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
     var repeatCount by rememberSaveable { mutableStateOf(taskToEdit?.repeatCount ?: 1) }
+
+    var selectedCategory by remember { mutableStateOf(taskToEdit?.category ?: preselectedCategory) }
+    var subTasksList by remember { mutableStateOf(taskToEdit?.subTasks ?: emptyList()) }
+    var showAddCategoryDialog by remember { mutableStateOf(false) }
 
     // Recurrence selection
     var everydayCount by rememberSaveable { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
@@ -146,7 +164,7 @@ fun TaskAddDialog(
                         .fillMaxWidth()
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
 
                 // Title Input
@@ -169,7 +187,7 @@ fun TaskAddDialog(
                         onValueChange = { descriptionValue = it },
                         label = { Text("Description") },
                         placeholder = { Text("Details (lines starting with '- ' show as bullets)") },
-                        minLines = 3,
+                        minLines = 2,
                         maxLines = 5,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -269,83 +287,465 @@ fun TaskAddDialog(
                     }
                 }
 
-                // Priority Selector with Up/Down buttons + Colors Box
+                // Balanced and beautiful Two-column layout: Priority selector on left, Category selector on right
+                var showPriorityDropdown by remember { mutableStateOf(false) }
+                var showCategoryDropdown by remember { mutableStateOf(false) }
+
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            text = "Priority Level",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = when (priority) {
-                                1 -> "Level 1: Urgent (Red)"
-                                2 -> "Level 2: High (Orange)"
-                                3 -> "Level 3: Medium (Amber)"
-                                4 -> "Level 4: Low (Mint/Yellow)"
-                                else -> "Level $priority"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
+                    // Column 1: Priority selector
                     Row(
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showPriorityDropdown = true }
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // Color Highlight Box showing current level
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    when (priority) {
-                                        1 -> PriorityRed
-                                        2 -> PriorityOrange
-                                        3 -> PriorityAmber
-                                        4 -> PriorityYellow
-                                        else -> Color.Gray
-                                    }
-                                )
-                                .border(
-                                    1.dp,
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                                    RoundedCornerShape(8.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = priority.toString(),
-                                fontWeight = FontWeight.Bold,
-                                color = if (priority == 4) Color.DarkGray else Color.White
+                                text = "Priority Level",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = when (priority) {
+                                    1 -> "Level 1: Urgent (Red)"
+                                    2 -> "Level 2: High (Orange)"
+                                    3 -> "Level 3: Medium (Amber)"
+                                    4 -> "Level 4: Low (Yellow)"
+                                    else -> "Level 1: Urgent (Red)"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        // Decrement Priority (Arrow Down) -> Moves to 4
-                        IconButton(
-                            onClick = { if (priority < 4) priority++ },
-                            enabled = priority < 4
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.KeyboardArrowDown, contentDescription = "Lower Priority")
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        when (priority) {
+                                            1 -> PriorityRed
+                                            2 -> PriorityOrange
+                                            3 -> PriorityAmber
+                                            4 -> PriorityYellow
+                                            else -> Color.Gray
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = priority.toString(),
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (priority == 4) Color.DarkGray else Color.White
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Select Priority",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
-
-                        // Increment Priority (Arrow Up) -> Moves to 1
-                        IconButton(
-                            onClick = { if (priority > 1) priority-- },
-                            enabled = priority > 1
+                        
+                        DropdownMenu(
+                            expanded = showPriorityDropdown,
+                            onDismissRequest = { showPriorityDropdown = false },
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.KeyboardArrowUp, contentDescription = "Raise Priority")
+                            (1..4).forEach { p ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = when (p) {
+                                                1 -> "Level 1: Urgent (Red)"
+                                                2 -> "Level 2: High (Orange)"
+                                                3 -> "Level 3: Medium (Amber)"
+                                                4 -> "Level 4: Low (Yellow)"
+                                                else -> ""
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        priority = p
+                                        showPriorityDropdown = false
+                                    },
+                                    leadingIcon = {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(
+                                                    when (p) {
+                                                        1 -> PriorityRed
+                                                        2 -> PriorityOrange
+                                                        3 -> PriorityAmber
+                                                        4 -> PriorityYellow
+                                                        else -> Color.Gray
+                                                    }
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = p.toString(),
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (p == 4) Color.DarkGray else Color.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Vertical Divider
+                    VerticalDivider(
+                        modifier = Modifier.fillMaxHeight().width(1.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+
+                    // Column 2: Category Selector
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { showCategoryDropdown = true }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Category / Tags",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (selectedCategory != null) {
+                                    val cat = selectedCategory!!
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                            .clickable { selectedCategory = null }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = cat,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Remove",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = "None",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Select Category",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+
+                        DropdownMenu(
+                            expanded = showCategoryDropdown,
+                            onDismissRequest = { showCategoryDropdown = false },
+                            shape = RoundedCornerShape(10.dp),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None") },
+                                onClick = {
+                                    selectedCategory = null
+                                    showCategoryDropdown = false
+                                }
+                            )
+                            val defaultCats = listOf("Personal", "Work", "Errands", "Health", "Learning")
+                            val allCategories = (defaultCats + customCategories).distinct()
+                            allCategories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat) },
+                                    onClick = {
+                                        selectedCategory = cat
+                                        showCategoryDropdown = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = getCategoryIcon(cat),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    },
+                                    trailingIcon = if (customCategories.contains(cat)) {
+                                        {
+                                            IconButton(
+                                                onClick = {
+                                                    onDeleteCustomCategory(cat)
+                                                    if (selectedCategory == cat) {
+                                                        selectedCategory = null
+                                                    }
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete custom tag",
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    } else null
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("+ Add custom category", color = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    showCategoryDropdown = false
+                                    showAddCategoryDialog = true
+                                }
+                            )
                         }
                     }
                 }
 
-                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                // Sub-tasks section
+                var subTasksExpanded by remember { mutableStateOf(true) }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { subTasksExpanded = !subTasksExpanded }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Sub-tasks",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${subTasksList.size}",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Icon(
+                                imageVector = if (subTasksExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Expand/Collapse subtasks",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
-                // Reminder notification setup for urgent tasks
+                    if (subTasksExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp).animateContentSize(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                subTasksList.forEachIndexed { index, sub ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 6.dp, horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DragHandle,
+                                                contentDescription = "Reorder",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = sub.title,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                subTasksList = subTasksList.filterIndexed { i, _ -> i != index }
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Delete sub-task",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    if (index < subTasksList.size - 1) {
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                            thickness = 1.dp,
+                                            modifier = Modifier.padding(horizontal = 12.dp)
+                                        )
+                                    }
+                                }
+
+                                // Add sub-task input row
+                                var isAddingSubTask by remember { mutableStateOf(false) }
+                                var newSubTaskTitle by remember { mutableStateOf("") }
+                                val subTaskFocusRequester = remember { FocusRequester() }
+                                
+                                if (isAddingSubTask) {
+                                    val keyboardController = LocalSoftwareKeyboardController.current
+                                    LaunchedEffect(Unit) {
+                                        delay(100)
+                                        subTaskFocusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = newSubTaskTitle,
+                                            onValueChange = { newSubTaskTitle = it },
+                                            placeholder = { Text("Enter sub-task...", fontSize = 14.sp) },
+                                            singleLine = true,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .focusRequester(subTaskFocusRequester),
+                                            shape = RoundedCornerShape(8.dp),
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                            keyboardActions = KeyboardActions(onDone = {
+                                                if (newSubTaskTitle.isNotBlank()) {
+                                                    subTasksList = subTasksList + SubTask(newSubTaskTitle.trim())
+                                                    newSubTaskTitle = ""
+                                                    isAddingSubTask = false
+                                                }
+                                            })
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                if (newSubTaskTitle.isNotBlank()) {
+                                                    subTasksList = subTasksList + SubTask(newSubTaskTitle.trim())
+                                                    newSubTaskTitle = ""
+                                                }
+                                                isAddingSubTask = false
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "Save",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                newSubTaskTitle = ""
+                                                isAddingSubTask = false
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Cancel",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { isAddingSubTask = true }
+                                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Add sub-task",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Add sub-task",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                    HorizontalDivider(
+                        Modifier,
+                        DividerDefaults.Thickness,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    )
+
+                    // Reminder notification setup for urgent tasks
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -650,7 +1050,9 @@ fun TaskAddDialog(
                                         description = descriptionValue.text,
                                         priority = priority,
                                         reminderTime = reminderTimestamp,
-                                        repeatCount = repeatCount
+                                        repeatCount = repeatCount,
+                                        subTasks = subTasksList,
+                                        category = selectedCategory
                                     )
                                 )
                                 Toast.makeText(context, "Task copied!", Toast.LENGTH_SHORT).show()
@@ -686,6 +1088,8 @@ fun TaskAddDialog(
                                     targetCal.timeInMillis
                                 }
                                 repeatCount = copiedTask.repeatCount
+                                subTasksList = copiedTask.subTasks
+                                selectedCategory = copiedTask.category
                                 Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
                             }
                         ) {
@@ -728,7 +1132,9 @@ fun TaskAddDialog(
                                 replicationDates.toList(),
                                 everydayCount,
                                 reminderTimestamp,
-                                repeatCount
+                                repeatCount,
+                                subTasksList,
+                                selectedCategory
                             )
                         },
                         modifier = Modifier.testTag("task_confirm_button")
@@ -738,6 +1144,48 @@ fun TaskAddDialog(
                 }
             }
         }
+    }
+
+    // Custom Category Name Input Dialog
+    if (showAddCategoryDialog) {
+        var categoryInputText by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showAddCategoryDialog = false },
+            title = { Text("Add Custom Category", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Enter a name for the new custom tag:")
+                    OutlinedTextField(
+                        value = categoryInputText,
+                        onValueChange = { categoryInputText = it },
+                        placeholder = { Text("e.g., Gym Workout") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val name = categoryInputText.trim()
+                        if (name.isNotBlank()) {
+                            onAddCustomCategory(name)
+                            selectedCategory = name
+                        }
+                        showAddCategoryDialog = false
+                    }
+                ) {
+                    Text("Add")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCategoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Custom Date Range Picker Dialog for replication selection
@@ -786,15 +1234,160 @@ fun TaskAddDialog(
     }
 }
 
-@Preview(showBackground = true)
+/**
+ * Helper to match category string with its designated icon.
+ */
 @Composable
-fun TaskAddDialogPreview() {
+fun getCategoryIcon(category: String): androidx.compose.ui.graphics.vector.ImageVector {
+    val lower = category.lowercase().trim()
+    return when {
+        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Icons.Default.Work
+        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Icons.Default.Person
+        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Icons.Default.ShoppingCart
+        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Icons.Default.FitnessCenter
+        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Icons.Default.Favorite
+        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Icons.Default.School
+        else -> Icons.Default.Sell
+    }
+}
+
+/**
+ * Visual chip for displaying and selecting categories. Keep in case you want to remvoe the dropdown menu later
+ */
+@Composable
+fun CategoryChip(
+    category: String,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: (() -> Unit)? = null
+) {
+    val containerColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    }
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .clickable { onSelect() }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = getCategoryIcon(category),
+            contentDescription = null,
+            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = category,
+            fontSize = AppFontSizes.extraSmall,
+            fontWeight = FontWeight.Bold,
+            color = contentColor
+        )
+        if (onDelete != null) {
+            Spacer(modifier = Modifier.width(2.dp))
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Delete custom tag",
+                tint = contentColor.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(14.dp)
+                    .clickable { onDelete() }
+            )
+        }
+    }
+}
+
+// --- Previews ---
+
+@Preview(showBackground = true, name = "New Task - Minimal Light")
+@Composable
+fun TaskAddDialogNewTaskPreview() {
     SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
         TaskAddDialog(
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _ -> }
+            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
+
+@Preview(showBackground = true, name = "Edit Task - Minimal Dark")
+@Composable
+fun TaskAddDialogEditTaskPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "dark") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> },
+            taskToEdit = previewTask
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Task with Subtasks State")
+@Composable
+fun TaskAddDialogSubtasksPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> },
+            taskToEdit = previewTask.copy(
+                subTasks = listOf(
+                    SubTask("Completed Subtask", true),
+                    SubTask("Pending Subtask", false),
+                    SubTask("Another Pending One", false)
+                )
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "New Task - Simple Theme")
+@Composable
+fun TaskAddDialogSimplePreview() {
+    SoftTodoTheme(colorSchemeType = "simple", themeMode = "light") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 2,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+private val previewTask = Task(
+    id = 101,
+    title = "Buy Groceries",
+    description = "Need to get some fresh vegetables and fruits.\n- Spinach\n- Apples\n- Bananas",
+    priority = 2,
+    dateAdded = "2023-11-05",
+    isCompleted = false,
+    reminderTime = System.currentTimeMillis() + 7200000,
+    repeatCount = 1,
+    subTasks = listOf(
+        SubTask("Spinach", true),
+        SubTask("Apples", false),
+        SubTask("Bananas", false)
+    ),
+    category = "Errands"
+)
