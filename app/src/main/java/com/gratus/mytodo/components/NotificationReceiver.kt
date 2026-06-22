@@ -10,6 +10,7 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.gratus.mytodo.MainActivity
+import com.gratus.mytodo.SnoozeActivity
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.R
@@ -43,6 +44,10 @@ class NotificationReceiver : BroadcastReceiver() {
                         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(taskId)
                         
+                        // Clear snooze preference
+                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
+
                         // Notify widgets
                         val updateIntent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
                             setPackage(context.packageName)
@@ -70,6 +75,10 @@ class NotificationReceiver : BroadcastReceiver() {
                         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(taskId)
                         
+                        // Clear snooze preference
+                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
+
                         // Notify widgets
                         val updateIntent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
                             setPackage(context.packageName)
@@ -94,11 +103,13 @@ class NotificationReceiver : BroadcastReceiver() {
                     if (task != null && !task.isCompleted && task.isReminderActive) {
                         showNotification(context, task)
 
+                        // Clear snooze preference since the snooze alarm just fired and is shown now
+                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
+
                         // Handle repeating alerts: 1x to 4x
                         if (task.repeatedTimes + 1 < task.repeatCount) {
-                            val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                            val intervalMins = sharedPrefs.getInt("reminder_repeat_interval", 10)
-                            val nextAlarmTime = System.currentTimeMillis() + (intervalMins * 60 * 1000L)
+                            val nextAlarmTime = System.currentTimeMillis() + (sharedPrefs.getInt("reminder_repeat_interval", 10) * 60 * 1000L)
                             
                             val updatedTask = task.copy(
                                 repeatedTimes = task.repeatedTimes + 1,
@@ -164,6 +175,18 @@ class NotificationReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Snooze action
+        val snoozeIntent = Intent(context, SnoozeActivity::class.java).apply {
+            putExtra("task_id", task.id)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val snoozePendingIntent = PendingIntent.getActivity(
+            context,
+            task.id + 300000,
+            snoozeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val priorityText = when (task.priority) {
             1 -> "Priority 1 (Urgent)"
             2 -> "Priority 2 (High)"
@@ -182,6 +205,7 @@ class NotificationReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .addAction(0, "Mark Complete", markCompletePendingIntent)
             .addAction(0, "Stop", stopPendingIntent)
+            .addAction(0, "Snooze", snoozePendingIntent)
             .build()
 
         manager.notify(task.id, notification)

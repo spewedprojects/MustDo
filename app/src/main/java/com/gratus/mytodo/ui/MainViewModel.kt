@@ -407,6 +407,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Cancel alarm if marked completed
             if (updatedWithReset.isCompleted) {
                 cancelReminder(updatedWithReset)
+                clearSnoozePreference(updatedWithReset.id)
             } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
                 scheduleExactReminder(updatedWithReset)
             }
@@ -456,6 +457,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             
             repository.updateTask(updated)
+            clearSnoozePreference(id)
             
             // Schedule new reminder if it's active and not completed
             if (!updated.isCompleted && reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
@@ -485,6 +487,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Handle reminders sync if status changed
             if (updatedTask.isCompleted) {
                 cancelReminder(updatedTask)
+                clearSnoozePreference(updatedTask.id)
             } else if (updatedTask.reminderTime != null && updatedTask.reminderTime > System.currentTimeMillis()) {
                 scheduleExactReminder(updatedTask)
             }
@@ -500,6 +503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteTask(task)
             cancelReminder(task)
+            clearSnoozePreference(task.id)
             updateWidget()
         }
     }
@@ -513,6 +517,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun cancelReminder(task: Task) {
         NotificationReceiver.cancelReminder(getApplication(), task)
+    }
+
+    private fun clearSnoozePreference(taskId: Int) {
+        sharedPrefs.edit().remove("snooze_until_$taskId").apply()
     }
 
     private fun updateWidget() {

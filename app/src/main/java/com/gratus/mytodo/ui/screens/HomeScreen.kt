@@ -3,6 +3,7 @@ package com.gratus.mytodo.ui.screens
 
 import android.app.DatePickerDialog
 import android.content.Intent
+import android.content.Context
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -865,21 +866,39 @@ fun TaskItemCard(
                 if (task.reminderTime != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     val isReminderActive = task.isReminderActive
+                    val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                    val snoozeUntil = sharedPrefs.getLong("snooze_until_${task.id}", 0L)
+                    val isSnoozed = snoozeUntil > System.currentTimeMillis()
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = if (isReminderActive) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                            contentDescription = if (isReminderActive) "Active reminder" else "Suspended reminder",
-                            tint = if (isCompleted || !isReminderActive) {
+                            imageVector = if (isSnoozed) {
+                                Icons.Default.Snooze
+                            } else if (isReminderActive) {
+                                Icons.Default.Notifications
+                            } else {
+                                Icons.Default.NotificationsOff
+                            },
+                            contentDescription = if (isSnoozed) {
+                                "Snoozed reminder"
+                            } else if (isReminderActive) {
+                                "Active reminder"
+                            } else {
+                                "Suspended reminder"
+                            },
+                            tint = if (isCompleted || (!isReminderActive && !isSnoozed)) {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             } else {
                                 MaterialTheme.colorScheme.primary
                             },
                             modifier = Modifier.size(12.dp)
                         )
-                        val statusText = if (isReminderActive) {
+                        val statusText = if (isSnoozed) {
+                            "Snoozed until: " + DateTimeUtils.formatAlarmTime(context, snoozeUntil)
+                        } else if (isReminderActive) {
                             "Alert scheduled: " + DateTimeUtils.formatAlarmTime(context, task.reminderTime) +
                                     if (task.repeatedTimes > 0) " (repeated ${task.repeatedTimes}x)" else ""
                         } else {
@@ -888,7 +907,7 @@ fun TaskItemCard(
                         Text(
                             text = statusText,
                             fontSize = AppFontSizes.micro,
-                            color = if (isCompleted || !isReminderActive) {
+                            color = if (isCompleted || (!isReminderActive && !isSnoozed)) {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             } else {
                                 MaterialTheme.colorScheme.primary
