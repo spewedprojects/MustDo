@@ -132,7 +132,7 @@ fun TaskAddDialog(
                 .testTag("task_add_dialog_card"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.dialogContainerColor,
                 contentColor = MaterialTheme.colorScheme.onSurface
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Elevation doesn't behave as intended when combined with a transparent bg.
@@ -361,7 +361,9 @@ fun TaskAddDialog(
                         DropdownMenu(
                             expanded = showPriorityDropdown,
                             onDismissRequest = { showPriorityDropdown = false },
-                            shape = RoundedCornerShape(10.dp)
+                            shape = RoundedCornerShape(10.dp),
+                            containerColor = MaterialTheme.colorScheme.dialogContainerColor,
+                            shadowElevation = 8.dp,
                         ) {
                             (1..4).forEach { p ->
                                 DropdownMenuItem(
@@ -484,6 +486,8 @@ fun TaskAddDialog(
                             expanded = showCategoryDropdown,
                             onDismissRequest = { showCategoryDropdown = false },
                             shape = RoundedCornerShape(10.dp),
+                            containerColor = MaterialTheme.colorScheme.dialogContainerColor,
+                            shadowElevation = 8.dp,
                         ) {
                             DropdownMenuItem(
                                 text = { Text("None") },
@@ -1151,6 +1155,12 @@ fun TaskAddDialog(
         var categoryInputText by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showAddCategoryDialog = false },
+            modifier = Modifier.border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(28.dp)
+            ),
+            containerColor = MaterialTheme.colorScheme.dialogContainerColor,
             title = { Text("Add Custom Category", fontWeight = FontWeight.Bold) },
             text = {
                 Column(
@@ -1177,12 +1187,12 @@ fun TaskAddDialog(
                         showAddCategoryDialog = false
                     }
                 ) {
-                    Text("Add")
+                    Text("Add", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddCategoryDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )

@@ -149,4 +149,4 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
 ### 3. Notification:
   - Add new button to notification - "Snooze". Hitting snooze will pop up system dialog that asks the duration (5/10/15/30mins).
   - The snooze function is different from the existing "Stop" and "Mark Complete" functions. Snooze will basically pause the reminder system for the selected duration, on resuming, the repetition of the reminder will continue at its own set duration.
-  - This duration can be written to prefs file only, no need to write it to the database since it will carry no meaning.
+  - This duration can be written to prefs file only, no need to write it to the database since it will carry no meaning. Or if there is a better way of doing it, show me.

@@ -161,3 +161,11 @@ fun SoftTodoTheme(
         content = content
     )
 }
+
+val ColorScheme.dialogContainerColor: Color
+    get() = when (this.surface) {
+        ColorfulDarkCard -> ColorfulDarkCard2
+        ColorfulLightCard -> ColorfulLightCard2
+        else -> this.surface
+    }
+

@@ -575,7 +575,7 @@ fun HomeScreenContent(
                 },
                 shape = RoundedCornerShape(28.dp)
             ),
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.dialogContainerColor,
             title = { Text("Delete Task", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
             text = { Text("Are you sure you want to delete this task?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
@@ -833,9 +833,9 @@ fun TaskItemCard(
                             ) {
                                 Icon(
                                     imageVector = if (subTask.isCompleted) {
-                                        Icons.Default.CheckBox
+                                        Icons.Default.CheckCircle
                                     } else {
-                                        Icons.Default.CheckBoxOutlineBlank
+                                        Icons.Default.RadioButtonUnchecked
                                     },
                                     contentDescription = "Toggle Subtask",
                                     tint = if (subTask.isCompleted || isCompleted) {

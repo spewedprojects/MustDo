@@ -8,14 +8,14 @@ plugins {
 
 android {
   namespace = "com.gratus.mytodo"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk { version = release(37) { minorApiLevel = 0 } }
 
   defaultConfig {
     applicationId = "com.gratus.mytodo"
     minSdk = 24
     targetSdk = 36
-    versionCode = 10
-    versionName = "5.0.0"
+    versionCode = 11
+    versionName = "5.0.1"
 
     // Pass versionName to the app as a resource
     resValue(
