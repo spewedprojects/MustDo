@@ -1056,7 +1056,8 @@ fun TaskAddDialog(
                                         reminderTime = reminderTimestamp,
                                         repeatCount = repeatCount,
                                         subTasks = subTasksList,
-                                        category = selectedCategory
+                                        category = selectedCategory,
+                                        originalDateAdded = taskToEdit.dateAdded
                                     )
                                 )
                                 Toast.makeText(context, "Task copied!", Toast.LENGTH_SHORT).show()

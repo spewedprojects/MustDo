@@ -113,7 +113,7 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
 
 # TODO #5:
 
-### 1. Task:
+### 1. Task: - (DONE - 21/06/2026)
   - Add option for sub-tasks. - (DONE - 21/06/2026)
   - Add option for category. Via tags. -  Category wise groups will be visible on main screen. - (DONE - 21/06/2026)
   - _**Broad Directions for subtasks and category:**_
@@ -150,3 +150,20 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
   - Add new button to notification - "Snooze". Hitting snooze will pop up system dialog that asks the duration (5/10/15/30mins).
   - The snooze function is different from the existing "Stop" and "Mark Complete" functions. Snooze will basically pause the reminder system for the selected duration, on resuming, the repetition of the reminder will continue at its own set duration.
   - This duration can be written to prefs file only, no need to write it to the database since it will carry no meaning. Or if there is a better way of doing it, show me.
+
+**_All the above tasks were marked done on 21/06/2026_**
+*********
+
+# TODO #6:
+
+### 1. Copy/paste function: - (DONE - 26/06/2026)
+ - Need to change the current logic of appearance of paste action button on all dates except today.
+ - The logic should be more like: it should only appear on all dates except the date from which the task is copied from.
+ - Action button animation: it shouldn't preload on already, only when the respective date pages are opened. It should pop up from behind the add task button, and should pop back down behind the add task button.
+
+### 2. Notifications and Reminders:
+ - Currently, the notifications pop up and show to use a regular notification with system default notification sound.
+ - I want to add new option in add dialog to let the user choose the scheduled reminder to be an alarm sort of thing or just notification.
+ - Consequently, some way of managing alarm tones should be baked in the settings; either custom or access system default options.
+ - If Alarm: A new UI screen that will pop on screen to show the task, with the existing buttons - "Mark Complete","Stop" and "Snooze". The behavior will be same as is exhibited by notifications. The only difference is the screen and tone. For the sake of aggressively reminding the user of the task.
+ - Assess how can this be handled if the screen is locked?

@@ -48,5 +48,6 @@ data class CopiedTask(
     val reminderTime: Long? = null,
     val repeatCount: Int = 1,
     val subTasks: List<SubTask> = emptyList(),
-    val category: String? = null
+    val category: String? = null,
+    val originalDateAdded: String = ""
 )

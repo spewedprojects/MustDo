@@ -455,9 +455,9 @@ fun HomeScreenContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             AnimatedVisibility(
-                visible = !DateTimeUtils.isToday(currentDate) && copiedTask != null,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
+                visible = copiedTask != null && copiedTask.originalDateAdded != DateTimeUtils.formatDbDate(currentDate),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -828,7 +828,7 @@ fun TaskItemCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onToggleSubComplete(index) }
-                                    .padding(vertical = 2.dp, horizontal = 8.dp),
+                                    .padding(vertical = 2.dp, horizontal = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
@@ -844,7 +844,7 @@ fun TaskItemCard(
                                     } else {
                                         MaterialTheme.colorScheme.outline
                                     },
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(18.dp)
                                 )
                                 Text(
                                     text = subTask.title,
