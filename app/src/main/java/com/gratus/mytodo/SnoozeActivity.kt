@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -64,158 +65,10 @@ class SnoozeActivity : ComponentActivity() {
                 themeMode = themeMode,
                 colorSchemeType = colorSchemeType
             ) {
-                var showCustomInput by remember { mutableStateOf(false) }
-                var customMinutesText by remember { mutableStateOf("") }
-
-                // Intercept back button to either navigate back to presets or perform fallback 5-min snooze
-                BackHandler {
-                    if (showCustomInput) {
-                        showCustomInput = false
-                        customMinutesText = ""
-                    } else {
-                        performSnooze(taskId, 5)
-                    }
-                }
-                
-                AlertDialog(
-                    onDismissRequest = { performSnooze(taskId, 5) },
-                    modifier = Modifier.border(
-                        width = 1.dp,
-                        color = if (colorSchemeType == "simple") {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                        } else if (colorSchemeType == "minimal") {
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                        } else {
-                            Color.Transparent
-                        },
-                        shape = RoundedCornerShape(28.dp)
-                    ),
-                    containerColor = MaterialTheme.colorScheme.dialogContainerColor,
-                    title = {
-                        Text(
-                            text = if (showCustomInput) "Custom Snooze" else "Snooze Reminder",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    },
-                    text = {
-                        if (!showCustomInput) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "Choose snooze duration:",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
-                                
-                                // Layout of preset times and custom button
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    val presets = listOf(5, 10, 15, 30)
-                                    presets.forEach { mins ->
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                                .clickable { performSnooze(taskId, mins) }
-                                                .padding(vertical = 12.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "${mins}m",
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            )
-                                        }
-                                    }
-                                    
-                                    // Custom duration (+) button
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.secondaryContainer)
-                                            .clickable { showCustomInput = true }
-                                            .padding(vertical = 12.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "+",
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 16.sp
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "Enter duration in minutes:",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                                
-                                OutlinedTextField(
-                                    value = customMinutesText,
-                                    onValueChange = { input ->
-                                        if (input.isEmpty() || input.all { it.isDigit() }) {
-                                            customMinutesText = input
-                                        }
-                                    },
-                                    label = { Text("Minutes") },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        if (showCustomInput) {
-                            TextButton(
-                                onClick = {
-                                    val mins = customMinutesText.toIntOrNull()
-                                    if (mins != null && mins > 0) {
-                                        performSnooze(taskId, mins)
-                                    } else {
-                                        Toast.makeText(this@SnoozeActivity, "Please enter a valid number of minutes", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            ) {
-                                Text("Set", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = {
-                                if (showCustomInput) {
-                                    showCustomInput = false
-                                    customMinutesText = ""
-                                } else {
-                                    performSnooze(taskId, 5)
-                                }
-                            }
-                        ) {
-                            Text(
-                                text = if (showCustomInput) "Back" else "Cancel",
-                                color = if (showCustomInput) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                SnoozeDialog(
+                    colorSchemeType = colorSchemeType,
+                    onSnooze = { mins -> performSnooze(taskId, mins) },
+                    onDismiss = { performSnooze(taskId, 5) }
                 )
             }
         }
@@ -236,14 +89,11 @@ class SnoozeActivity : ComponentActivity() {
                     // 3. Compute target snooze alarm time
                     val snoozeUntil = System.currentTimeMillis() + (snoozeMins * 60 * 1000L)
 
-                    // 4. Save snooze_until preference
-                    val sharedPrefs = getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                    sharedPrefs.edit().putLong("snooze_until_$taskId", snoozeUntil).apply()
-
-                    // 5. Update task details in DB
+                    // 4. Update task details in DB
                     val updatedTask = task.copy(
                         repeatedTimes = prevRepeatedTimes,
-                        nextReminderTime = snoozeUntil
+                        nextReminderTime = snoozeUntil,
+                        snoozedUntil = snoozeUntil
                     )
                     db.taskDao().updateTask(updatedTask)
 
@@ -271,6 +121,194 @@ class SnoozeActivity : ComponentActivity() {
                     finish()
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SnoozeDialog(
+    colorSchemeType: String,
+    onSnooze: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showCustomInput by remember { mutableStateOf(false) }
+    var customMinutesText by remember { mutableStateOf("") }
+
+    // Intercept back button to either navigate back to presets or perform fallback 5-min snooze
+    BackHandler {
+        if (showCustomInput) {
+            showCustomInput = false
+            customMinutesText = ""
+        } else {
+            onDismiss()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = modifier.border(
+            width = 1.dp,
+            color = if (colorSchemeType == "simple") {
+                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+            } else if (colorSchemeType == "minimal") {
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+            } else {
+                Color.Transparent
+            },
+            shape = RoundedCornerShape(28.dp)
+        ),
+        containerColor = MaterialTheme.colorScheme.dialogContainerColor,
+        title = {
+            Text(
+                text = if (showCustomInput) "Custom Snooze" else "Snooze Reminder",
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            if (!showCustomInput) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Choose snooze duration:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    // Layout of preset times and custom button
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val presets = listOf(5, 10, 15, 30)
+                        presets.forEach { mins ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable { onSnooze(mins) }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${mins}m",
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        // Custom duration (+) button
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .clickable { showCustomInput = true }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "+",
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Enter duration in minutes:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = customMinutesText,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.all { it.isDigit() }) {
+                                customMinutesText = input
+                            }
+                        },
+                        label = { Text("Minutes") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (showCustomInput) {
+                TextButton(
+                    onClick = {
+                        val mins = customMinutesText.toIntOrNull()
+                        if (mins != null && mins > 0) {
+                            onSnooze(mins)
+                        }
+                    }
+                ) {
+                    Text("Set", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    if (showCustomInput) {
+                        showCustomInput = false
+                        customMinutesText = ""
+                    } else {
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text(
+                    text = if (showCustomInput) "Back" else "Cancel",
+                    color = if (showCustomInput) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    )
+}
+
+@Preview(showBackground = true, name = "Snooze Dialog - Minimal Dark")
+@Composable
+fun SnoozeDialogMinimalDarkPreview() {
+    SoftTodoTheme(themeMode = "dark", colorSchemeType = "minimal") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            SnoozeDialog(
+                colorSchemeType = "minimal",
+                onSnooze = {},
+                onDismiss = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Snooze Dialog - Simple Light")
+@Composable
+fun SnoozeDialogSimpleLightPreview() {
+    SoftTodoTheme(themeMode = "light", colorSchemeType = "simple") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            SnoozeDialog(
+                colorSchemeType = "simple",
+                onSnooze = {},
+                onDismiss = {}
+            )
         }
     }
 }

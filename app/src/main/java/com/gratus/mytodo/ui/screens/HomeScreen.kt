@@ -86,11 +86,11 @@ fun HomeScreen(
         onSetDate = { viewModel.setDate(it) },
         onToggleComplete = { viewModel.toggleCompleted(it) },
         onDeleteTask = { viewModel.deleteTask(it) },
-        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category ->
-            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category)
+        onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+            viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
         },
-        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category ->
-            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category)
+        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
         },
         onCopy = { viewModel.setCopiedTask(it) },
         onAddCustomCategory = { viewModel.addCustomCategory(it) },
@@ -122,8 +122,8 @@ fun HomeScreenContent(
     onSetDate: (Calendar) -> Unit,
     onToggleComplete: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
-    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?) -> Unit,
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String) -> Unit,
     onCopy: (CopiedTask) -> Unit,
     onAddCustomCategory: (String) -> Unit,
     onDeleteCustomCategory: (String) -> Unit,
@@ -483,7 +483,8 @@ fun HomeScreenContent(
                                  newReminderTime,
                                  copied.repeatCount,
                                  copied.subTasks,
-                                 copied.category
+                                 copied.category,
+                                 copied.reminderType
                              )
                             Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
                         }
@@ -524,8 +525,8 @@ fun HomeScreenContent(
                 onShowAddDialogChange(false)
                 preselectedCategory.value = null
             },
-            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category ->
-                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category)
+            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+                onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
                 onShowAddDialogChange(false)
                 preselectedCategory.value = null
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
@@ -548,8 +549,8 @@ fun HomeScreenContent(
             lastUsedPriority = lastUsedPriority,
             taskToEdit = taskToEdit,
             onDismiss = { onTaskToEditChange(null) },
-            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount, subTasks, category ->
-                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category)
+            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
             },
@@ -866,8 +867,7 @@ fun TaskItemCard(
                 if (task.reminderTime != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     val isReminderActive = task.isReminderActive
-                    val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                    val snoozeUntil = sharedPrefs.getLong("snooze_until_${task.id}", 0L)
+                    val snoozeUntil = task.snoozedUntil ?: 0L
                     val isSnoozed = snoozeUntil > System.currentTimeMillis()
 
                     Row(
@@ -1072,8 +1072,8 @@ fun HomeScreenMinimalPreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},
@@ -1105,8 +1105,8 @@ fun HomeScreenSimplePreview() {
             onSetDate = {},
             onToggleComplete = {},
             onDeleteTask = {},
-            onAddTask = { _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},

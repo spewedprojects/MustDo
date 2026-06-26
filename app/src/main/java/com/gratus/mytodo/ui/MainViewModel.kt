@@ -98,6 +98,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sharedPrefs.edit().putInt("reminder_repeat_interval", minutes).apply()
     }
 
+    private val _settingsAlarmRingtone = MutableStateFlow<String?>(sharedPrefs.getString("alarm_ringtone_uri", null))
+    val settingsAlarmRingtone: StateFlow<String?> = _settingsAlarmRingtone.asStateFlow()
+
+    fun setAlarmRingtone(uriString: String?) {
+        _settingsAlarmRingtone.value = uriString
+        if (uriString != null) {
+            sharedPrefs.edit().putString("alarm_ringtone_uri", uriString).apply()
+        } else {
+            sharedPrefs.edit().remove("alarm_ringtone_uri").apply()
+        }
+    }
+
     // Category / Tag Management
     private val defaultCategories = listOf("Personal", "Work", "Errands", "Health", "Learning")
     private val _customCategories = MutableStateFlow<List<String>>(
@@ -329,7 +341,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reminderTimeMillis: Long? = null,
         repeatCount: Int = 1,
         subTasks: List<SubTask> = emptyList(),
-        category: String? = null
+        category: String? = null,
+        reminderType: String = "notification"
     ) {
         viewModelScope.launch {
             val dateStr = DateTimeUtils.formatDbDate(targetDate)
@@ -346,7 +359,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isReminderActive = true,
                 nextReminderTime = reminderTimeMillis,
                 subTasks = subTasks,
-                category = category
+                category = category,
+                reminderType = reminderType,
+                snoozedUntil = null
             )
 
             // Save last used priority
@@ -364,7 +379,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Replicate to custom selected future dates
             replicateDates.forEach { futureDate ->
                 if (futureDate != dateStr) {
-                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null, nextReminderTime = null)
+                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null, nextReminderTime = null, reminderType = reminderType, snoozedUntil = null)
                     repository.insertTask(futureTask)
                 }
             }
@@ -377,7 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         add(Calendar.DAY_OF_YEAR, i)
                     }
                     val dailyStr = DateTimeUtils.formatDbDate(runCal)
-                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null, nextReminderTime = null)
+                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null, nextReminderTime = null, reminderType = reminderType, snoozedUntil = null)
                     repository.insertTask(everydayTask)
                 }
             }
@@ -395,7 +410,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val updatedSubTasks = task.subTasks.map { it.copy(isCompleted = newCompleted) }
             val updated = task.copy(
                 isCompleted = newCompleted,
-                subTasks = updatedSubTasks
+                subTasks = updatedSubTasks,
+                snoozedUntil = null
             )
             val updatedWithReset = if (!updated.isCompleted) {
                 updated.copy(repeatedTimes = 0, isReminderActive = true, nextReminderTime = updated.reminderTime)
@@ -407,7 +423,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Cancel alarm if marked completed
             if (updatedWithReset.isCompleted) {
                 cancelReminder(updatedWithReset)
-                clearSnoozePreference(updatedWithReset.id)
             } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
                 scheduleExactReminder(updatedWithReset)
             }
@@ -427,7 +442,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         reminderTimeMillis: Long? = null,
         repeatCount: Int = 1,
         subTasks: List<SubTask> = emptyList(),
-        category: String? = null
+        category: String? = null,
+        reminderType: String = "notification"
     ) {
         viewModelScope.launch {
             val original = repository.getTaskById(id) ?: return@launch
@@ -453,11 +469,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 nextReminderTime = reminderTimeMillis,
                 subTasks = subTasks,
                 category = category,
-                isCompleted = isMainCompleted
+                isCompleted = isMainCompleted,
+                reminderType = reminderType,
+                snoozedUntil = null
             )
             
             repository.updateTask(updated)
-            clearSnoozePreference(id)
             
             // Schedule new reminder if it's active and not completed
             if (!updated.isCompleted && reminderTimeMillis != null && reminderTimeMillis > System.currentTimeMillis()) {
@@ -480,14 +497,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             val updatedTask = task.copy(
                 subTasks = updatedSubTasks,
-                isCompleted = isMainCompleted
+                isCompleted = isMainCompleted,
+                snoozedUntil = if (isMainCompleted) null else task.snoozedUntil
             )
             repository.updateTask(updatedTask)
             
             // Handle reminders sync if status changed
             if (updatedTask.isCompleted) {
                 cancelReminder(updatedTask)
-                clearSnoozePreference(updatedTask.id)
             } else if (updatedTask.reminderTime != null && updatedTask.reminderTime > System.currentTimeMillis()) {
                 scheduleExactReminder(updatedTask)
             }
@@ -503,7 +520,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteTask(task)
             cancelReminder(task)
-            clearSnoozePreference(task.id)
             updateWidget()
         }
     }
@@ -517,10 +533,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun cancelReminder(task: Task) {
         NotificationReceiver.cancelReminder(getApplication(), task)
-    }
-
-    private fun clearSnoozePreference(taskId: Int) {
-        sharedPrefs.edit().remove("snooze_until_$taskId").apply()
     }
 
     private fun updateWidget() {

@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import com.gratus.mytodo.MainActivity
 import com.gratus.mytodo.SnoozeActivity
+import com.gratus.mytodo.AlarmActivity
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.TaskDatabase
 import com.gratus.mytodo.R
@@ -29,6 +30,14 @@ class NotificationReceiver : BroadcastReceiver() {
         val taskId = intent.getIntExtra("task_id", -1)
         if (taskId == -1) return
 
+        if (action == ACTION_ALARM_TIMEOUT) {
+            val pendingResult = goAsync()
+            performSnooze(context, taskId, 5) {
+                pendingResult.finish()
+            }
+            return
+        }
+
         if (action == ACTION_MARK_COMPLETE) {
             val pendingResult = goAsync()
             val db = TaskDatabase.getDatabase(context)
@@ -36,18 +45,22 @@ class NotificationReceiver : BroadcastReceiver() {
                 try {
                     val task = db.taskDao().getTaskById(taskId)
                     if (task != null) {
-                        val updated = task.copy(isCompleted = true)
+                        val updated = task.copy(isCompleted = true, snoozedUntil = null)
                         db.taskDao().updateTask(updated)
                         cancelReminder(context, updated)
+                        cancelAlarmTimeout(context, taskId)
                         
                         // Dismiss notification
                         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(taskId)
-                        
-                        // Clear snooze preference
-                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
 
+                        // If it's an alarm, stop the AlarmService alarm
+                        val serviceIntent = Intent(context, AlarmService::class.java).apply {
+                            this.action = AlarmService.ACTION_STOP_ALARM
+                            putExtra("task_id", taskId)
+                        }
+                        context.startService(serviceIntent)
+                        
                         // Notify widgets
                         val updateIntent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
                             setPackage(context.packageName)
@@ -67,18 +80,22 @@ class NotificationReceiver : BroadcastReceiver() {
                 try {
                     val task = db.taskDao().getTaskById(taskId)
                     if (task != null) {
-                        val updated = task.copy(isReminderActive = false, repeatedTimes = 0, nextReminderTime = null)
+                        val updated = task.copy(isReminderActive = false, repeatedTimes = 0, nextReminderTime = null, snoozedUntil = null)
                         db.taskDao().updateTask(updated)
                         cancelReminder(context, task)
+                        cancelAlarmTimeout(context, taskId)
                         
                         // Dismiss notification
                         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         manager.cancel(taskId)
-                        
-                        // Clear snooze preference
-                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
 
+                        // If it's an alarm, stop the AlarmService alarm
+                        val serviceIntent = Intent(context, AlarmService::class.java).apply {
+                            this.action = AlarmService.ACTION_STOP_ALARM
+                            putExtra("task_id", taskId)
+                        }
+                        context.startService(serviceIntent)
+                        
                         // Notify widgets
                         val updateIntent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
                             setPackage(context.packageName)
@@ -93,25 +110,40 @@ class NotificationReceiver : BroadcastReceiver() {
             }
         } else {
             val pendingResult = goAsync()
-            // Fetch task details in background thread
             val db = TaskDatabase.getDatabase(context)
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val task = db.taskDao().getTaskById(taskId)
                     
-                    // Show notification if task is not completed yet and reminders are active
                     if (task != null && !task.isCompleted && task.isReminderActive) {
-                        showNotification(context, task)
+                        if (task.reminderType == "alarm") {
+                            // Start Alarm Service
+                            val serviceIntent = Intent(context, AlarmService::class.java).apply {
+                                this.action = AlarmService.ACTION_START_ALARM
+                                putExtra("task_id", taskId)
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                context.startForegroundService(serviceIntent)
+                            } else {
+                                context.startService(serviceIntent)
+                            }
+                            // Schedule safety timeout alarm
+                            scheduleAlarmTimeout(context, taskId)
+                        } else {
+                            // Regular Notification reminder
+                            showNotification(context, task)
+                        }
 
-                        // Clear snooze preference since the snooze alarm just fired and is shown now
-                        val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
-                        sharedPrefs.edit().remove("snooze_until_${task.id}").apply()
+                        // Clear snooze field in DB since the alarm/reminder fired now
+                        val updatedTaskWithReset = task.copy(snoozedUntil = null)
+                        db.taskDao().updateTask(updatedTaskWithReset)
 
                         // Handle repeating alerts: 1x to 4x
                         if (task.repeatedTimes + 1 < task.repeatCount) {
+                            val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
                             val nextAlarmTime = System.currentTimeMillis() + (sharedPrefs.getInt("reminder_repeat_interval", 10) * 60 * 1000L)
                             
-                            val updatedTask = task.copy(
+                            val updatedTask = updatedTaskWithReset.copy(
                                 repeatedTimes = task.repeatedTimes + 1,
                                 nextReminderTime = nextAlarmTime
                             )
@@ -214,6 +246,7 @@ class NotificationReceiver : BroadcastReceiver() {
     companion object {
         const val ACTION_MARK_COMPLETE = "com.gratus.mytodo.action.MARK_COMPLETE"
         const val ACTION_STOP_REMINDERS = "com.gratus.mytodo.action.STOP_REMINDERS"
+        const val ACTION_ALARM_TIMEOUT = "com.gratus.mytodo.action.ALARM_TIMEOUT"
 
         fun scheduleExactReminder(context: Context, task: Task) {
             val time = task.nextReminderTime ?: task.reminderTime ?: return
@@ -231,10 +264,23 @@ class NotificationReceiver : BroadcastReceiver() {
             )
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                if (task.reminderType == "alarm") {
+                    val openIntent = Intent(context, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                    val showIntent = PendingIntent.getActivity(
+                        context,
+                        task.id + 400000,
+                        openIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    alarmManager.setAlarmClock(AlarmManager.AlarmClockInfo(time, showIntent), pendingIntent)
                 } else {
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, time, pendingIntent)
+                    }
                 }
             } catch (e: SecurityException) {
                 android.util.Log.e("NotificationReceiver", "Permission denied for exact alarms: ${e.message}")
@@ -252,6 +298,91 @@ class NotificationReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             alarmManager.cancel(pendingIntent)
+            cancelAlarmTimeout(context, task.id)
+        }
+
+        fun scheduleAlarmTimeout(context: Context, taskId: Int) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = ACTION_ALARM_TIMEOUT
+                putExtra("task_id", taskId)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                taskId + 500000,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val triggerTime = System.currentTimeMillis() + (2 * 60 * 1000L) // 2 minutes
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                }
+            } catch (e: SecurityException) {
+                android.util.Log.e("NotificationReceiver", "Permission denied scheduling timeout: ${e.message}")
+            }
+        }
+
+        fun cancelAlarmTimeout(context: Context, taskId: Int) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, NotificationReceiver::class.java).apply {
+                action = ACTION_ALARM_TIMEOUT
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                taskId + 500000,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+        }
+
+        fun performSnooze(context: Context, taskId: Int, snoozeMins: Int, onComplete: (() -> Unit)? = null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val db = TaskDatabase.getDatabase(context)
+                    val task = db.taskDao().getTaskById(taskId)
+                    if (task != null) {
+                        cancelReminder(context, task)
+                        cancelAlarmTimeout(context, taskId)
+
+                        val prevRepeatedTimes = (task.repeatedTimes - 1).coerceAtLeast(0)
+                        val snoozeUntil = System.currentTimeMillis() + (snoozeMins * 60 * 1000L)
+
+                        val updatedTask = task.copy(
+                            repeatedTimes = prevRepeatedTimes,
+                            nextReminderTime = snoozeUntil,
+                            snoozedUntil = snoozeUntil
+                        )
+                        db.taskDao().updateTask(updatedTask)
+
+                        scheduleExactReminder(context, updatedTask)
+
+                        // Stop service alarm for this task
+                        val serviceIntent = Intent(context, AlarmService::class.java).apply {
+                            action = AlarmService.ACTION_STOP_ALARM
+                            putExtra("task_id", taskId)
+                        }
+                        context.startService(serviceIntent)
+
+                        // Dismiss notification
+                        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        manager.cancel(taskId)
+
+                        // Notify widgets
+                        val updateIntent = Intent("com.gratus.mytodo.action.WIDGET_UPDATE").apply {
+                            setPackage(context.packageName)
+                        }
+                        context.sendBroadcast(updateIntent)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("NotificationReceiver", "Error performSnooze: ${e.message}", e)
+                } finally {
+                    onComplete?.invoke()
+                }
+            }
         }
     }
 }

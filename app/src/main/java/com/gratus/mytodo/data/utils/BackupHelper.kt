@@ -31,6 +31,8 @@ object BackupHelper {
                 put("isReminderActive", task.isReminderActive)
                 put("nextReminderTime", task.nextReminderTime ?: JSONObject.NULL)
                 put("category", task.category ?: JSONObject.NULL)
+                put("reminderType", task.reminderType)
+                put("snoozedUntil", task.snoozedUntil ?: JSONObject.NULL)
                 put("subTasks", JSONArray().apply {
                     task.subTasks.forEach { sub ->
                         put(JSONObject().apply {
@@ -57,6 +59,9 @@ object BackupHelper {
             val nextReminderTime = if (obj.has("nextReminderTime") && !obj.isNull("nextReminderTime")) obj.getLong("nextReminderTime") else null
             
             val category = if (obj.has("category") && !obj.isNull("category")) obj.getString("category") else null
+            val reminderType = if (obj.has("reminderType") && !obj.isNull("reminderType")) obj.getString("reminderType") else "notification"
+            val snoozedUntil = if (obj.has("snoozedUntil") && !obj.isNull("snoozedUntil")) obj.getLong("snoozedUntil") else null
+
             val subTasksList = ArrayList<SubTask>()
             if (obj.has("subTasks")) {
                 val subArr = obj.getJSONArray("subTasks")
@@ -84,7 +89,9 @@ object BackupHelper {
                 isReminderActive = if (obj.has("isReminderActive")) obj.getBoolean("isReminderActive") else true,
                 nextReminderTime = nextReminderTime ?: reminderTime,
                 subTasks = subTasksList,
-                category = category
+                category = category,
+                reminderType = reminderType,
+                snoozedUntil = snoozedUntil
             )
             tasks.add(task)
         }

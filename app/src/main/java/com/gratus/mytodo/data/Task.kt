@@ -35,7 +35,9 @@ data class Task(
     val isReminderActive: Boolean = true, // If false, the reminder alerts are suspended for the task
     val nextReminderTime: Long? = null, // Millisecond timestamp for the next repeating alarm, or null
     val subTasks: List<SubTask> = emptyList(), // JSON serialized list of sub-tasks
-    val category: String? = null // Nullable category tag (e.g. Work, Personal)
+    val category: String? = null, // Nullable category tag (e.g. Work, Personal)
+    val reminderType: String = "notification", // "notification" or "alarm"
+    val snoozedUntil: Long? = null // Millisecond timestamp for when the snooze expires, or null
 )
 
 /**
@@ -49,5 +51,6 @@ data class CopiedTask(
     val repeatCount: Int = 1,
     val subTasks: List<SubTask> = emptyList(),
     val category: String? = null,
+    val reminderType: String = "notification",
     val originalDateAdded: String = ""
 )

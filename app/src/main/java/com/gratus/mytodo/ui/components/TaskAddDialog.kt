@@ -50,6 +50,7 @@ import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.rememberDateRangePickerState
@@ -75,7 +76,8 @@ fun TaskAddDialog(
         reminderTimeMillis: Long?,
         repeatCount: Int,
         subTasks: List<SubTask>,
-        category: String?
+        category: String?,
+        reminderType: String
     ) -> Unit,
     taskToEdit: Task? = null,
     preselectedCategory: String? = null,
@@ -98,6 +100,7 @@ fun TaskAddDialog(
 
     // Alarm reminder state (timestamp milliseconds)
     var reminderTimestamp by rememberSaveable { mutableStateOf<Long?>(taskToEdit?.reminderTime) }
+    var reminderType by rememberSaveable { mutableStateOf(taskToEdit?.reminderType ?: "notification") }
     var repeatCount by rememberSaveable { mutableStateOf(taskToEdit?.repeatCount ?: 1) }
 
     var selectedCategory by remember { mutableStateOf(taskToEdit?.category ?: preselectedCategory) }
@@ -882,6 +885,57 @@ fun TaskAddDialog(
                         }
                     }}
 
+                if (reminderTimestamp != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Reminder Type",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val types = listOf(
+                                Pair("notification", "Notification"),
+                                Pair("alarm", "Alarm")
+                            )
+                            types.forEach { (type, label) ->
+                                val selected = reminderType == type
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            if (selected) MaterialTheme.colorScheme.primaryContainer 
+                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (selected) MaterialTheme.colorScheme.primary 
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { reminderType = type }
+                                        .padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        textAlign = TextAlign.Center,
+                                        fontSize = AppFontSizes.extraSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
+                                                else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (taskToEdit == null) {
                     Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
@@ -1057,6 +1111,7 @@ fun TaskAddDialog(
                                         repeatCount = repeatCount,
                                         subTasks = subTasksList,
                                         category = selectedCategory,
+                                        reminderType = reminderType,
                                         originalDateAdded = taskToEdit.dateAdded
                                     )
                                 )
@@ -1095,6 +1150,7 @@ fun TaskAddDialog(
                                 repeatCount = copiedTask.repeatCount
                                 subTasksList = copiedTask.subTasks
                                 selectedCategory = copiedTask.category
+                                reminderType = copiedTask.reminderType
                                 Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
                             }
                         ) {
@@ -1139,7 +1195,8 @@ fun TaskAddDialog(
                                 reminderTimestamp,
                                 repeatCount,
                                 subTasksList,
-                                selectedCategory
+                                selectedCategory,
+                                reminderType
                             )
                         },
                         modifier = Modifier.testTag("task_confirm_button")
@@ -1202,6 +1259,7 @@ fun TaskAddDialog(
     // Custom Date Range Picker Dialog for replication selection
     if (showRangePickerDialog) {
         val dateRangePickerState = rememberDateRangePickerState()
+
         DatePickerDialog(
             onDismissRequest = { showRangePickerDialog = false },
             confirmButton = {
@@ -1210,37 +1268,88 @@ fun TaskAddDialog(
                         val startMillis = dateRangePickerState.selectedStartDateMillis
                         val endMillis = dateRangePickerState.selectedEndDateMillis
                         if (startMillis != null && endMillis != null) {
-                            val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
-                            val endCal = Calendar.getInstance().apply { timeInMillis = endMillis }
+                            // Extract year, month, and day in UTC timezone to prevent offset warping
+                            val startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = startMillis }
+                            val endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = endMillis }
 
                             val dates = mutableListOf<String>()
                             val cursor = startCal.clone() as Calendar
                             while (!cursor.after(endCal)) {
-                                dates.add(DateTimeUtils.formatDbDate(cursor))
+                                val localCal = Calendar.getInstance().apply {
+                                    set(Calendar.YEAR, cursor.get(Calendar.YEAR))
+                                    set(Calendar.MONTH, cursor.get(Calendar.MONTH))
+                                    set(Calendar.DAY_OF_MONTH, cursor.get(Calendar.DAY_OF_MONTH))
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                dates.add(DateTimeUtils.formatDbDate(localCal))
                                 cursor.add(Calendar.DAY_OF_YEAR, 1)
                             }
                             replicationDates = dates
-                         } else if (startMillis != null) {
-                             val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
-                             replicationDates = listOf(DateTimeUtils.formatDbDate(startCal))
-                         }
+                        } else if (startMillis != null) {
+                            val startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = startMillis }
+                            val localCal = Calendar.getInstance().apply {
+                                set(Calendar.YEAR, startCal.get(Calendar.YEAR))
+                                set(Calendar.MONTH, startCal.get(Calendar.MONTH))
+                                set(Calendar.DAY_OF_MONTH, startCal.get(Calendar.DAY_OF_MONTH))
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            replicationDates = listOf(DateTimeUtils.formatDbDate(localCal))
+                        }
                         showRangePickerDialog = false
                     }
                 ) {
-                    Text("OK")
+                    Text("Confirm", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRangePickerDialog = false }) {
                     Text("Cancel")
                 }
-            }
+            },
+            shape = RoundedCornerShape(28.dp),
+            tonalElevation = 6.dp
         ) {
-            DateRangePicker(
-                state = dateRangePickerState,
-                modifier = Modifier.weight(1f).padding(16.dp),
-                title = { Text("Pick Replication Range", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            )
+            // We use a Column to wrap the picker to prevent the layout from "warping"
+            // within the Dialog's constraints.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                DateRangePicker(
+                    state = dateRangePickerState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp), // Height limit fixes the stretched look
+                    title = {
+                        Text(
+                            text = "Select Range",
+                            modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 16.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    },
+                    // Removed the manual 'headline' block.
+                    // The picker will now automatically show "Start Date - End Date" correctly.
+
+                    // Fixed the color parameters to use standard M3 ColorScheme
+                    colors = DatePickerDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        selectedDayContainerColor = MaterialTheme.colorScheme.primary,
+                        dayInSelectionRangeContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        selectedDayContentColor = MaterialTheme.colorScheme.onPrimary,
+                        dayInSelectionRangeContentColor = MaterialTheme.colorScheme.onSurface,
+                        todayContentColor = MaterialTheme.colorScheme.primary,
+                        todayDateBorderColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
         }
     }
 }
@@ -1334,7 +1443,7 @@ fun TaskAddDialogNewTaskPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> }
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -1347,7 +1456,7 @@ fun TaskAddDialogEditTaskPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> },
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask
         )
     }
@@ -1361,7 +1470,7 @@ fun TaskAddDialogSubtasksPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> },
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask.copy(
                 subTasks = listOf(
                     SubTask("Completed Subtask", true),
@@ -1381,7 +1490,71 @@ fun TaskAddDialogSimplePreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 2,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _ -> }
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "New Task - Colorful Dark Theme")
+@Composable
+fun TaskAddDialogColorfulDarkPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 3,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Edit Task - Recurring Alarm")
+@Composable
+fun TaskAddDialogRecurringAlarmPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            taskToEdit = previewTask.copy(
+                isRecurring = true,
+                repeatCount = 3,
+                reminderType = "alarm",
+                title = "Critical System Maintenance"
+            )
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "New Task - High Priority Light")
+@Composable
+fun TaskAddDialogHighPriorityPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Edit Task - Scheduled Task")
+@Composable
+fun TaskAddDialogScheduledTaskPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        TaskAddDialog(
+            initialDate = Calendar.getInstance(),
+            lastUsedPriority = 2,
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            taskToEdit = previewTask.copy(
+                title = "Team Sync Meeting",
+                description = "Discuss weekly progress and updates",
+                reminderTime = System.currentTimeMillis() + 3600000,
+                reminderType = "notification"
+            )
         )
     }
 }

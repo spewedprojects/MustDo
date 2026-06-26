@@ -2,6 +2,8 @@ package com.gratus.mytodo.ui.screens
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.RingtoneManager
+import android.net.Uri
 import android.content.Intent
 import android.os.Build
 import android.os.Environment
@@ -48,6 +50,16 @@ fun SettingsScreen(
     val activeInterval by viewModel.settingsReminderInterval.collectAsState()
     val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
+    val alarmRingtoneUri by viewModel.settingsAlarmRingtone.collectAsState()
+
+    val ringtonePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            viewModel.setAlarmRingtone(uri?.toString())
+        }
+    }
 
     SettingsScreenContent(
         activeTheme = activeTheme,
@@ -106,6 +118,18 @@ fun SettingsScreen(
             } catch (e: Exception) {
                 onComplete(false, false)
             }
+        },
+        ringtoneUri = alarmRingtoneUri,
+        onRingtoneClick = {
+            val existingUri = alarmRingtoneUri?.let { Uri.parse(it) }
+            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Select Alarm Tone")
+                putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existingUri)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+            }
+            ringtonePickerLauncher.launch(intent)
         }
     )
 }
@@ -122,7 +146,9 @@ fun SettingsScreenContent(
     onIntervalChange: (Int) -> Unit,
     onExportJson: (java.io.OutputStream) -> Boolean,
     onExportDb: (java.io.OutputStream) -> Boolean,
-    onImportBackup: (java.io.InputStream, (Boolean, isDb: Boolean) -> Unit) -> Unit
+    onImportBackup: (java.io.InputStream, (Boolean, isDb: Boolean) -> Unit) -> Unit,
+    ringtoneUri: String?,
+    onRingtoneClick: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -483,6 +509,39 @@ fun SettingsScreenContent(
                         }
                     }
                 }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+
+                // Alarm ringtone configuration row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onRingtoneClick() }
+                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Alarm Ringtone",
+                            fontSize = AppFontSizes.medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = getRingtoneTitle(context, ringtoneUri),
+                            fontSize = AppFontSizes.small,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.VolumeUp,
+                        contentDescription = "Select Alarm Tone",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
 
@@ -611,6 +670,17 @@ private fun saveBackupToDownloads(
     return success
 }
 
+private fun getRingtoneTitle(context: Context, uriString: String?): String {
+    if (uriString.isNullOrEmpty()) return "Default Alarm Tone"
+    return try {
+        val uri = Uri.parse(uriString)
+        val ringtone = RingtoneManager.getRingtone(context, uri)
+        ringtone?.getTitle(context) ?: "Unknown Tone"
+    } catch (e: Exception) {
+        "Default Alarm Tone"
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun SettingsScreenPreview() {
@@ -626,7 +696,9 @@ fun SettingsScreenPreview() {
             onIntervalChange = {},
             onExportJson = { true },
             onExportDb = { true },
-            onImportBackup = { _, _ -> }
+            onImportBackup = { _, _ -> },
+            ringtoneUri = null,
+            onRingtoneClick = {}
         )
     }
 }
