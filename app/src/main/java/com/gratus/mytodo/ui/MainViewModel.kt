@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import com.gratus.mytodo.data.utils.BackupHelper
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.*
@@ -231,6 +233,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         checkPermissions(application)
         updateWidget()
+        
+        // Reschedule alarms to keep in sync
+        NotificationReceiver.rescheduleAllAlarms(application)
     }
 
     /**
@@ -671,22 +676,73 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Backups JSON importing.
+     * Imports backup from a given Uri. Automatically detects format (SQLite vs JSON),
+     * manages threading on Dispatchers.IO, handles database closing/replacing,
+     * reschedules alarms accordingly, and invokes callbacks on the Main thread.
      */
-    fun importBackup(jsonStr: String, onComplete: (Boolean) -> Unit) {
-        viewModelScope.launch {
+    fun importBackupUri(uri: Uri, onComplete: (Boolean, isDb: Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val tasks = BackupHelper.importTasksFromJson(jsonStr)
-                if (tasks.isNotEmpty()) {
-                    repository.insertTasks(tasks)
-                    updateWidget()
-                    onComplete(true)
-                } else {
-                    onComplete(false)
+                val context = getApplication<Application>()
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val fileBytes = inputStream.readBytes()
+                    val magicString = if (fileBytes.size >= 15) {
+                        String(fileBytes, 0, 15, Charsets.US_ASCII)
+                    } else {
+                        ""
+                    }
+
+                    if (magicString == "SQLite format 3") {
+                        TaskDatabase.closeDatabase()
+                        val dbFile = context.getDatabasePath("task_database")
+                        val dbWalFile = context.getDatabasePath("task_database-wal")
+                        val dbShmFile = context.getDatabasePath("task_database-shm")
+
+                        dbFile.outputStream().use { output ->
+                            output.write(fileBytes)
+                        }
+
+                        if (dbWalFile.exists()) dbWalFile.delete()
+                        if (dbShmFile.exists()) dbShmFile.delete()
+
+                        withContext(Dispatchers.Main) {
+                            onComplete(true, true)
+                        }
+                    } else {
+                        val jsonStr = String(fileBytes, Charsets.UTF_8)
+                        val tasks = BackupHelper.importTasksFromJson(jsonStr)
+                        if (tasks.isNotEmpty()) {
+                            // Cancel existing alarms before replacing/merging
+                            val currentTasks = repository.getAllTasksDirect()
+                            for (task in currentTasks) {
+                                NotificationReceiver.cancelReminder(context, task)
+                            }
+
+                            repository.insertTasks(tasks)
+                            updateWidget()
+
+                            // Reschedule all active alarms from updated DB state
+                            NotificationReceiver.rescheduleAllAlarms(context)
+
+                            withContext(Dispatchers.Main) {
+                                onComplete(true, false)
+                            }
+                        } else {
+                            withContext(Dispatchers.Main) {
+                                onComplete(false, false)
+                            }
+                        }
+                    }
+                } ?: run {
+                    withContext(Dispatchers.Main) {
+                        onComplete(false, false)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("MainViewModel", "Import failed: ${e.message}")
-                onComplete(false)
+                Log.e("MainViewModel", "Backup import from URI failed: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    onComplete(false, false)
+                }
             }
         }
     }
@@ -700,32 +756,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
         } catch (e: Exception) {
             Log.e("MainViewModel", "Checkpoint failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Closes the active database, replaces task_database with the backup, and deletes WAL/SHM pages.
-     */
-    fun importDbBackup(inputStream: java.io.InputStream, onComplete: (Boolean) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                TaskDatabase.closeDatabase()
-                val dbFile = getApplication<Application>().getDatabasePath("task_database")
-                val dbWalFile = getApplication<Application>().getDatabasePath("task_database-wal")
-                val dbShmFile = getApplication<Application>().getDatabasePath("task_database-shm")
-                
-                dbFile.outputStream().use { output ->
-                    inputStream.copyTo(output)
-                }
-                
-                if (dbWalFile.exists()) dbWalFile.delete()
-                if (dbShmFile.exists()) dbShmFile.delete()
-                
-                onComplete(true)
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "DB Import failed: ${e.message}", e)
-                onComplete(false)
-            }
         }
     }
 }

@@ -36,6 +36,10 @@ import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.text.format
 
 /**
  * SettingsScreen includes theme configurations, color scheme selectors, and backups.
@@ -95,28 +99,9 @@ fun SettingsScreen(
                 false
             }
         },
-        onImportBackup = { inputStream, onComplete ->
-            try {
-                val fileBytes = inputStream.readBytes()
-                val magicString = if (fileBytes.size >= 15) {
-                    String(fileBytes, 0, 15, Charsets.US_ASCII)
-                } else {
-                    ""
-                }
-                
-                if (magicString == "SQLite format 3") {
-                    val byteStream = java.io.ByteArrayInputStream(fileBytes)
-                    viewModel.importDbBackup(byteStream) { success ->
-                        onComplete(success, true)
-                    }
-                } else {
-                    val jsonStr = String(fileBytes, Charsets.UTF_8)
-                    viewModel.importBackup(jsonStr) { success ->
-                        onComplete(success, false)
-                    }
-                }
-            } catch (e: Exception) {
-                onComplete(false, false)
+        onImportBackup = { uri, onComplete ->
+            viewModel.importBackupUri(uri) { success, isDb ->
+                onComplete(success, isDb)
             }
         },
         ringtoneUri = alarmRingtoneUri,
@@ -146,7 +131,7 @@ fun SettingsScreenContent(
     onIntervalChange: (Int) -> Unit,
     onExportJson: (java.io.OutputStream) -> Boolean,
     onExportDb: (java.io.OutputStream) -> Boolean,
-    onImportBackup: (java.io.InputStream, (Boolean, isDb: Boolean) -> Unit) -> Unit,
+    onImportBackup: (Uri, (Boolean, isDb: Boolean) -> Unit) -> Unit,
     ringtoneUri: String?,
     onRingtoneClick: () -> Unit
 ) {
@@ -156,28 +141,22 @@ fun SettingsScreenContent(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    onImportBackup(inputStream) { success, isDb ->
-                        if (success) {
-                            if (isDb) {
-                                Toast.makeText(context, "Database restored successfully! Restarting...", Toast.LENGTH_LONG).show()
-                                val activity = context as? android.app.Activity
-                                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                                intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                context.startActivity(intent)
-                                activity?.finish()
-                                Runtime.getRuntime().exit(0)
-                            } else {
-                                Toast.makeText(context, "JSON Backup imported successfully! Alarms recalculated.", Toast.LENGTH_LONG).show()
-                            }
-                        } else {
-                            Toast.makeText(context, "Import failed: Invalid backup file format", Toast.LENGTH_LONG).show()
+            onImportBackup(uri) { success, isDb ->
+                if (success) {
+                    if (isDb) {
+                        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            putExtra("SHOW_RESTORE_SUCCESS_TOAST", true)
                         }
+                        if (intent != null) {
+                            context.startActivity(intent)
+                        }
+                    } else {
+                        Toast.makeText(context, "JSON Backup imported successfully! Alarms recalculated.", Toast.LENGTH_LONG).show()
                     }
+                } else {
+                    Toast.makeText(context, "Import failed: Invalid backup file format", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -270,7 +249,7 @@ fun SettingsScreenContent(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
-                                    if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f) 
+                                    if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
                                 )
                                 .border(
@@ -490,7 +469,7 @@ fun SettingsScreenContent(
                                     )
                                     .border(
                                         1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary 
+                                        if (isSelected) MaterialTheme.colorScheme.primary
                                         else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                                         RoundedCornerShape(8.dp)
                                     )
@@ -577,20 +556,47 @@ fun SettingsScreenContent(
                     // Export to Device Button
                     Button(
                         onClick = {
-                            val jsonSuccess = saveBackupToDownloads(context, "todo_backup.json", "application/json") { output ->
+                            val jsonSuccess = saveBackupToDocuments(
+                                context,
+                                "todo_backup",
+                                ".json",
+                                "application/json"
+                            ) { output ->
                                 onExportJson(output)
                             }
-                            val dbSuccess = saveBackupToDownloads(context, "todo_backup.db", "application/octet-stream") { output ->
+
+                            val dbSuccess = saveBackupToDocuments(
+                                context,
+                                "todo_backup",
+                                ".db",
+                                "application/octet-stream"
+                            ) { output ->
                                 onExportDb(output)
                             }
                             if (jsonSuccess && dbSuccess) {
-                                Toast.makeText(context, "Backup files exported to Downloads folder!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(
+                                    context,
+                                    "Backup files exported to Documents folder!",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             } else if (jsonSuccess) {
-                                Toast.makeText(context, "JSON exported, but Database file export failed", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "JSON exported, but Database file export failed",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } else if (dbSuccess) {
-                                Toast.makeText(context, "Database exported, but JSON backup failed", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Database exported, but JSON backup failed",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } else {
-                                Toast.makeText(context, "Export failed. Please check storage.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Export failed. Please check storage.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                         modifier = Modifier
@@ -622,31 +628,39 @@ fun SettingsScreenContent(
 }
 
 /**
- * Saves a backup file directly to the device's public Downloads directory.
+ * Saves a backup file directly to the device's public Documents directory.
+ * Appends the current date in yyyy-MM-dd format to the filename.
  */
-private fun saveBackupToDownloads(
+private fun saveBackupToDocuments(
     context: Context,
-    fileName: String,
+    baseFileName: String, // e.g., "todo_backup"
+    extension: String,     // e.g., ".json"
     mimeType: String,
     dataWriter: (java.io.OutputStream) -> Boolean
 ): Boolean {
+    // 1. Prepare the date-stamped filename
+    val dateStamp = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    val fullFileName = "${baseFileName}_$dateStamp$extension"
+
     val resolver = context.contentResolver
     val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fullFileName)
         put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            // Changed from DIRECTORY_DOWNLOADS to DIRECTORY_DOCUMENTS
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS + "/MustdoBackups")
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
     }
     
     val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+        resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
     } else {
-        // Fallback for pre-Android 10
+        // Fallback for pre-Android 10 (Legacy Storage)
         @Suppress("DEPRECATION")
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val file = File(downloadsDir, fileName)
+        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS + "/MustdoBackups")
+        if (!docsDir.exists() && !docsDir.mkdirs()) return false
+        val file = File(docsDir, fullFileName)
         try {
             file.outputStream().use { return dataWriter(it) }
         } catch (e: Exception) {

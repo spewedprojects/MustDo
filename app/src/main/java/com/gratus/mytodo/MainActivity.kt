@@ -73,6 +73,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Check if database was restored successfully to show the toast
+        if (intent.getBooleanExtra("SHOW_RESTORE_SUCCESS_TOAST", false)) {
+            Toast.makeText(this, "Database restored successfully!", Toast.LENGTH_LONG).show()
+        }
+
         // Prompt notification permission at boot on Android 13+
         checkNotificationPermissions()
 

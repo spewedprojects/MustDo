@@ -248,6 +248,26 @@ class NotificationReceiver : BroadcastReceiver() {
         const val ACTION_STOP_REMINDERS = "com.gratus.mytodo.action.STOP_REMINDERS"
         const val ACTION_ALARM_TIMEOUT = "com.gratus.mytodo.action.ALARM_TIMEOUT"
 
+        fun rescheduleAllAlarms(context: Context) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val db = TaskDatabase.getDatabase(context)
+                    val tasks = db.taskDao().getAllTasksDirect()
+                    val currentTime = System.currentTimeMillis()
+                    for (task in tasks) {
+                        val time = task.nextReminderTime ?: task.reminderTime
+                        if (task.isCompleted || !task.isReminderActive || time == null || time <= currentTime) {
+                            cancelReminder(context, task)
+                        } else {
+                            scheduleExactReminder(context, task)
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("NotificationReceiver", "Failed to reschedule alarms", e)
+                }
+            }
+        }
+
         fun scheduleExactReminder(context: Context, task: Task) {
             val time = task.nextReminderTime ?: task.reminderTime ?: return
             if (!task.isReminderActive || task.isCompleted) return

@@ -54,6 +54,7 @@ import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.rememberDateRangePickerState
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import java.util.*
 
@@ -180,7 +181,11 @@ fun TaskAddDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("task_title_input"),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Next,
+                        capitalization = KeyboardCapitalization.Sentences
+                    )
                 )
 
                 // Description Input & Custom Formatting Toolbar
@@ -196,7 +201,10 @@ fun TaskAddDialog(
                             .fillMaxWidth()
                             .testTag("task_desc_input"),
                         shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            imeAction = ImeAction.Done
+                        )
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -678,7 +686,10 @@ fun TaskAddDialog(
                                                 .weight(1f)
                                                 .focusRequester(subTaskFocusRequester),
                                             shape = RoundedCornerShape(8.dp),
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                            keyboardOptions = KeyboardOptions(
+                                                imeAction = ImeAction.Done,
+                                                capitalization = KeyboardCapitalization.Sentences
+                                            ),
                                             keyboardActions = KeyboardActions(onDone = {
                                                 if (newSubTaskTitle.isNotBlank()) {
                                                     subTasksList = subTasksList + SubTask(newSubTaskTitle.trim())
@@ -1116,6 +1127,7 @@ fun TaskAddDialog(
                                     )
                                 )
                                 Toast.makeText(context, "Task copied!", Toast.LENGTH_SHORT).show()
+                                onDismiss()
                             }
                         ) {
                             Row(
@@ -1230,7 +1242,8 @@ fun TaskAddDialog(
                         onValueChange = { categoryInputText = it },
                         placeholder = { Text("e.g., Gym Workout") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
                     )
                 }
             },

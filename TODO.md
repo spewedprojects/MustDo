@@ -161,9 +161,20 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
  - The logic should be more like: it should only appear on all dates except the date from which the task is copied from.
  - Action button animation: it shouldn't preload on already, only when the respective date pages are opened. It should pop up from behind the add task button, and should pop back down behind the add task button.
 
-### 2. Notifications and Reminders:
+### 2. Notifications and Reminders: - (DONE - 27/06/2026)
  - Currently, the notifications pop up and show to use a regular notification with system default notification sound.
  - I want to add new option in add dialog to let the user choose the scheduled reminder to be an alarm sort of thing or just notification.
  - Consequently, some way of managing alarm tones should be baked in the settings; either custom or access system default options.
  - If Alarm: A new UI screen that will pop on screen to show the task, with the existing buttons - "Mark Complete","Stop" and "Snooze". The behavior will be same as is exhibited by notifications. The only difference is the screen and tone. For the sake of aggressively reminding the user of the task.
  - Assess how can this be handled if the screen is locked?
+
+*********
+
+# TODO #7:
+
+### 1. Copy/Paste function: - (DONE)
+ - Remove shadow from paste floating button, give it a border.
+
+### 2. Export function: - (DONE)
+ - I changed the method from saveBackupToDownloads to saveBackupToDocuments, along with subsequent changes within its function as well as Export button on click.
+ - The whole point was to export the backups to a preset folder name in documents directory (as mentioned in the function/method), appended with export date stamp, without having to open file manager to select folders.

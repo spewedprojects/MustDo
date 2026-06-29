@@ -272,7 +272,7 @@ fun HomeScreenContent(
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(
-                        if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface 
+                        if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface
                         else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
                     )
                     .clickable {
@@ -456,8 +456,8 @@ fun HomeScreenContent(
         ) {
             AnimatedVisibility(
                 visible = copiedTask != null && copiedTask.originalDateAdded != DateTimeUtils.formatDbDate(currentDate),
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
             ) {
                 FloatingActionButton(
                     onClick = {
@@ -491,8 +491,10 @@ fun HomeScreenContent(
                     },
                     modifier = Modifier
                         .size(48.dp)
-                        .testTag("paste_task_fab"),
+                        .testTag("paste_task_fab")
+                        .border(width = 1.dp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), shape = CircleShape),
                     shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp),
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                 ) {
