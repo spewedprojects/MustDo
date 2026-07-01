@@ -53,7 +53,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
-import com.gratus.mytodo.ui.DisplayType
+
 import com.gratus.mytodo.ui.FilterOption
 import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.components.parseStyledDescription
@@ -61,6 +61,9 @@ import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.*
+import com.gratus.mytodo.ui.components.getCategoryIcon
+import com.gratus.mytodo.ui.screens.getCategoryAccentColor
+import androidx.compose.ui.platform.LocalLocale
 
 /**
  * Historical records screen with filtering, date classification, and structural pinch-to-zoom.
@@ -73,20 +76,17 @@ fun HistoryScreen(
     val tasks by viewModel.historyTasks.collectAsState(initial = emptyList())
     val query by viewModel.searchQuery.collectAsState()
     val zoomLevel by viewModel.historyZoomLevel.collectAsState()
-    val displayType by viewModel.historyDisplayType.collectAsState()
     val activeFilter by viewModel.historyFilter.collectAsState()
 
     HistoryScreenContent(
         tasks = tasks,
         query = query,
         zoomLevel = zoomLevel,
-        displayType = displayType,
         activeFilter = activeFilter,
         colorSchemeType = colorSchemeType,
         onQueryChange = { viewModel.setSearchQuery(it) },
         onZoomChange = { viewModel.zoomHistory(it) },
         onZoomLevelSet = { viewModel.setHistoryZoom(it) },
-        onDisplayTypeChange = { viewModel.setHistoryDisplay(it) },
         onFilterChange = { viewModel.setHistoryFilter(it) }
     )
 }
@@ -100,13 +100,11 @@ fun HistoryScreenContent(
     tasks: List<Task>,
     query: String,
     zoomLevel: Int,
-    displayType: DisplayType,
     activeFilter: FilterOption,
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
     onZoomChange: (Int) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
-    onDisplayTypeChange: (DisplayType) -> Unit,
     onFilterChange: (FilterOption) -> Unit
 ) {
     val context = LocalContext.current
@@ -214,52 +212,6 @@ fun HistoryScreenContent(
                         )
                     }
 
-                    // Display Type Toggle (List or Container card groups)
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .border(
-                                1.dp,
-                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                RoundedCornerShape(8.dp)
-                            )
-                    ) {
-                        IconButton(
-                            onClick = { onDisplayTypeChange(DisplayType.LIST) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(
-                                    if (displayType == DisplayType.LIST) MaterialTheme.colorScheme.primaryContainer 
-                                    else Color.Transparent
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.List,
-                                contentDescription = "List display option",
-                                tint = if (displayType == DisplayType.LIST) MaterialTheme.colorScheme.onPrimaryContainer 
-                                       else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { onDisplayTypeChange(DisplayType.GROUPED) },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(
-                                    if (displayType == DisplayType.GROUPED) MaterialTheme.colorScheme.primaryContainer 
-                                    else Color.Transparent
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.GridView,
-                                contentDescription = "Grouped display option",
-                                tint = if (displayType == DisplayType.GROUPED) MaterialTheme.colorScheme.onPrimaryContainer 
-                                       else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
 
                     // Filter dropdown
                     Row(
@@ -530,6 +482,17 @@ fun YearView(
                                                     fontSize = AppFontSizes.extraSmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { if (total > 0) done.toFloat() / total.toFloat() else 0f },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth(0.6f)
+                                                        .height(3.dp)
+                                                        .clip(RoundedCornerShape(50)),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                                                )
                                             }
                                         }
                                     }
@@ -631,7 +594,7 @@ fun MonthView(
                                             val total = weekTasks.size
                                             val done = weekTasks.count { it.isCompleted }
                                             val weekDate = DateTimeUtils.parseDbDate(weekStartStr) ?: Date()
-                                            val weekLabel = SimpleDateFormat("MMM dd", Locale.getDefault()).format(weekDate)
+                                            val weekLabel = SimpleDateFormat("MMM dd", LocalLocale.current.platformLocale).format(weekDate)
 
                                             Card(
                                                 modifier = Modifier
@@ -660,6 +623,17 @@ fun MonthView(
                                                         text = "$done/$total tasks",
                                                         fontSize = AppFontSizes.micro,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    LinearProgressIndicator(
+                                                        progress = { if (total > 0) done.toFloat() / total.toFloat() else 0f },
+                                                        modifier = Modifier
+                                                            .fillMaxWidth(0.6f)
+                                                            .height(3.dp)
+                                                            .clip(RoundedCornerShape(50)),
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                                                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                                                     )
                                                 }
                                             }
@@ -710,7 +684,7 @@ fun WeekView(
                 val total = weekTasks.size
                 val done = weekTasks.count { it.isCompleted }
                 val weekDate = DateTimeUtils.parseDbDate(weekStartStr) ?: Date()
-                val weekLabel = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(weekDate)
+                val weekLabel = SimpleDateFormat("MMM dd, yyyy", LocalLocale.current.platformLocale).format(weekDate)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -782,7 +756,7 @@ fun WeekView(
                                             val dayStr = dayList[index]
                                             val dayTasks = daysInWeek[dayStr] ?: emptyList()
                                             val dayDate = DateTimeUtils.parseDbDate(dayStr) ?: Date()
-                                            val dayLabelStr = SimpleDateFormat("EEE, MMM dd", Locale.getDefault()).format(dayDate)
+                                            val dayLabelStr = SimpleDateFormat("EEE, MMM dd", LocalLocale.current.platformLocale).format(dayDate)
 
                                             Card(
                                                 modifier = Modifier
@@ -807,14 +781,26 @@ fun WeekView(
                                                         color = MaterialTheme.colorScheme.secondary
                                                     )
                                                     dayTasks.take(3).forEach { task ->
-                                                        Text(
-                                                            text = task.title,
-                                                            fontSize = AppFontSizes.micro,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            if (task.category != null) {
+                                                                Icon(
+                                                                    imageVector = getCategoryIcon(task.category),
+                                                                    contentDescription = task.category,
+                                                                    tint = getCategoryAccentColor(task.category),
+                                                                    modifier = Modifier.size(10.dp)
+                                                                )
+                                                            }
+                                                            Text(
+                                                                text = task.title,
+                                                                fontSize = AppFontSizes.micro,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
                                                     }
                                                     if (dayTasks.size > 3) {
                                                         Text(
@@ -909,8 +895,7 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
     
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (isCompleted) 0.65f else 1.0f),
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted) {
                 if (colorSchemeType == "minimal") {
@@ -968,15 +953,34 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                         )
                     }
                 }
-                
-                Text(
-                    text = task.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = AppFontSizes.large,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    if (task.category != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = getCategoryIcon(task.category),
+                                contentDescription = task.category,
+                                tint = getCategoryAccentColor(task.category),
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = task.category.uppercase(),
+                                fontSize = AppFontSizes.nano,
+                                fontWeight = FontWeight.Bold,
+                                color = getCategoryAccentColor(task.category)
+                            )
+                        }
+                    }
+                    Text(
+                        text = task.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = AppFontSizes.large,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 
                 val badgeStyle = if (colorSchemeType == "minimal") {
                     getMinimalPriorityColors(task.priority, isCompleted, isDark)
@@ -1015,6 +1019,31 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                     fontSize = AppFontSizes.medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            
+            if (task.subTasks.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    task.subTasks.forEach { subTask ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (subTask.isCompleted) Icons.Default.Check else Icons.Default.Close,
+                                contentDescription = null,
+                                tint = if (subTask.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = subTask.title,
+                                fontSize = AppFontSizes.small,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
             
             if (task.reminderTime != null || task.isRecurring) {
@@ -1100,8 +1129,7 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .alpha(if (isCompleted) 0.55f else 1.0f),
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted) {
                 if (colorSchemeType == "minimal") {
@@ -1181,8 +1209,7 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
                         fontSize = titleSize,
                         maxLines = if (zoomLevel == 1) 1 else 2,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     // Display tiny date if not in Grouped mode
                     Text(
@@ -1248,13 +1275,13 @@ fun HistoryScreenPreview() {
             tasks = sampleHistoryTasks,
             query = "",
             zoomLevel = 3,
-            displayType = DisplayType.GROUPED,
+
             activeFilter = FilterOption.ALL,
             colorSchemeType = "simple",
             onQueryChange = {},
             onZoomChange = {},
             onZoomLevelSet = {},
-            onDisplayTypeChange = {},
+
             onFilterChange = {}
         )
     }

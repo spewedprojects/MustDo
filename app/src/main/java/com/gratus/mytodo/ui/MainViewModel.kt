@@ -63,14 +63,6 @@ enum class SortOption {
 }
 
 /**
- * Historical screen display modes.
- */
-enum class DisplayType {
-    LIST,
-    GROUPED
-}
-
-/**
  * Historical filter modes.
  */
 enum class FilterOption {
@@ -231,11 +223,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _historyZoomLevel = MutableStateFlow(3) // 0 (Year), 1 (Month), 2 (Week), 3 (Regular)
+    private val _historyZoomLevel = MutableStateFlow(3)
     val historyZoomLevel: StateFlow<Int> = _historyZoomLevel.asStateFlow()
-
-    private val _historyDisplayType = MutableStateFlow(DisplayType.LIST)
-    val historyDisplayType: StateFlow<DisplayType> = _historyDisplayType.asStateFlow()
 
     private val _historyFilter = MutableStateFlow(FilterOption.ALL)
     val historyFilter: StateFlow<FilterOption> = _historyFilter.asStateFlow()
@@ -594,10 +583,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     fun setHistoryZoom(level: Int) {
         _historyZoomLevel.value = level.coerceIn(0, 3)
-    }
-
-    fun setHistoryDisplay(type: DisplayType) {
-        _historyDisplayType.value = type
     }
 
     fun setHistoryFilter(filter: FilterOption) {
