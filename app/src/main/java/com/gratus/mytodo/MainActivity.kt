@@ -61,6 +61,7 @@ import com.gratus.mytodo.ui.SortOption
 import com.gratus.mytodo.ui.components.FaintBackground
 import com.gratus.mytodo.ui.screens.HistoryScreen
 import com.gratus.mytodo.ui.screens.HomeScreen
+import com.gratus.mytodo.ui.screens.IssueTrackerScreen
 import com.gratus.mytodo.ui.screens.SettingsScreen
 import com.gratus.mytodo.ui.screens.StatsScreen
 import com.gratus.mytodo.ui.theme.AppFontSizes
@@ -68,6 +69,12 @@ import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import kotlinx.coroutines.launch
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.*
+import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 
@@ -183,6 +190,7 @@ fun MainLayout(
                 Screen.HISTORY -> HistoryScreen(viewModel, colorSchemeType)
                 Screen.STATS -> StatsScreen(viewModel, colorSchemeType)
                 Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
+                Screen.ISSUE_TRACKER -> IssueTrackerScreen(onOpenDrawer, colorSchemeType)
             }
         }
     )
@@ -230,7 +238,7 @@ fun MainLayoutContent(
                     .windowInsetsPadding(WindowInsets.statusBars), // Safely pad camera notch / cutout
                 containerColor = Color.Transparent, // Let the custom backgrounds flow through
                 topBar = {
-                    CenterAlignedTopAppBar(
+                        CenterAlignedTopAppBar(
                         title = {
                             if (activeScreen == Screen.HOME) {
                                 // Center consumed by Date and arrows to navigate dates
@@ -281,6 +289,7 @@ fun MainLayoutContent(
                                         Screen.HISTORY -> "Historical Timelines"
                                         Screen.STATS -> "Completion Statistics"
                                         Screen.SETTINGS -> "Settings Profile"
+                                        Screen.ISSUE_TRACKER -> "Issue Tracker"
                                         else -> "MustDo"
                                     },
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
@@ -341,6 +350,7 @@ fun MainLayoutContent(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppDrawerContent(
     activeScreen: Screen,
@@ -401,20 +411,65 @@ fun AppDrawerContent(
         )
 
         navItems.forEach { (screenKey, name, icon) ->
-            NavigationDrawerItem(
-                icon = { Icon(imageVector = icon, contentDescription = name) },
-                label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
-                selected = activeScreen == screenKey,
-                onClick = {
-                    onSetActiveScreen(screenKey)
-                    onCloseDrawer()
-                },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                colors = NavigationDrawerItemDefaults.colors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    unselectedContainerColor = Color.Transparent
+            if (screenKey == Screen.SETTINGS) {
+                val selected = activeScreen == screenKey
+                val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 2.dp)
+                        .height(56.dp)
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .combinedClickable(
+                            onClick = {
+                                onSetActiveScreen(screenKey)
+                                onCloseDrawer()
+                            },
+                            onLongClick = {
+                                onSetActiveScreen(Screen.ISSUE_TRACKER)
+                                onCloseDrawer()
+                            }
+                        ),
+                    color = containerColor,
+                    contentColor = contentColor,
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 16.dp, end = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = name,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else contentColor
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = AppFontSizes.medium,
+                            color = contentColor
+                        )
+                    }
+                }
+            } else {
+                NavigationDrawerItem(
+                    icon = { Icon(imageVector = icon, contentDescription = name) },
+                    label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
+                    selected = activeScreen == screenKey,
+                    onClick = {
+                        onSetActiveScreen(screenKey)
+                        onCloseDrawer()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedContainerColor = Color.Transparent
+                    )
                 )
-            )
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))

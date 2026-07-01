@@ -207,7 +207,11 @@ fun HistoryScreenContent(
                             ).show()
                         }
                     ) {
-                        Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Pick Date as Filter")
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = "Pick Date as Filter",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
                     }
 
                     // Display Type Toggle (List or Container card groups)

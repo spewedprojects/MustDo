@@ -168,6 +168,8 @@ All the above tasks were marked done on 10/06/2026 0015hrs.
  - If Alarm: A new UI screen that will pop on screen to show the task, with the existing buttons - "Mark Complete","Stop" and "Snooze". The behavior will be same as is exhibited by notifications. The only difference is the screen and tone. For the sake of aggressively reminding the user of the task.
  - Assess how can this be handled if the screen is locked?
 
+
+**_All the above tasks were marked done between 26-27/06/2026_**
 *********
 
 # TODO #7:

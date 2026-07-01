@@ -50,7 +50,8 @@ enum class Screen {
     HOME,
     HISTORY,
     STATS,
-    SETTINGS
+    SETTINGS,
+    ISSUE_TRACKER
 }
 
 /**
