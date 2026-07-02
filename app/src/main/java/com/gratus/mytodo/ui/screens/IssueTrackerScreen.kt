@@ -36,6 +36,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -58,12 +59,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gratus.mytodo.data.IssueItem
+import com.gratus.mytodo.data.IssueComment
 import com.gratus.mytodo.ui.IssueFilter
 import com.gratus.mytodo.ui.IssueTrackerViewModel
 import com.gratus.mytodo.ui.components.FaintBackground
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
+import com.gratus.mytodo.ui.theme.dialogContainerColor
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.Calendar
 
@@ -141,114 +144,140 @@ fun IssueTrackerScreenContent(
                 }
             }
         ) { paddingValues ->
-            LazyColumn(
+            // Use a Column to stack the Header (Static) and the LazyColumn (Scrollable)
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                        )
+            ){
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = onSearchQueryChange,
-                                placeholder = { Text("Search issues...") },
-                                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { onSearchQueryChange("") }) {
-                                            Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear search")
-                                        }
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = { Text("Search issues...") },
+                            leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { onSearchQueryChange("") }) {
+                                        Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear search")
                                     }
-                                },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, capitalization = KeyboardCapitalization.Sentences)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            TextButton(onClick = onExport)
+                            {
+                                Text(
+                                    text = "Export",
+                                    fontSize = AppFontSizes.small,
+                                    fontWeight = FontWeight.Bold
                                 )
-                            )
+                                Spacer(Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Export",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .border(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                        RoundedCornerShape(8.dp)
+                                    )
                             ) {
-                                TextButton(onClick = onExport)
-                                {
-                                    Text(
-                                        text = "Export",
-                                        fontSize = AppFontSizes.small,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Export",
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surface)
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                ) {
-                                    listOf(
-                                        Pair(IssueFilter.ALL, "All"),
-                                        Pair(IssueFilter.OPEN, "Open"),
-                                        Pair(IssueFilter.CLOSED, "Closed")
-                                    ).forEach { (opt, label) ->
-                                        val active = currentFilter == opt
-                                        Box(
-                                            modifier = Modifier
-                                                .clickable { onFilterChange(opt) }
-                                                .background(
-                                                    if (active) MaterialTheme.colorScheme.secondaryContainer 
-                                                    else Color.Transparent
-                                                )
-                                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = AppFontSizes.extraSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (active) MaterialTheme.colorScheme.onSecondaryContainer 
-                                                        else MaterialTheme.colorScheme.onSurface
+                                listOf(
+                                    Pair(IssueFilter.ALL, "All (${issues.size})"),
+                                    Pair(IssueFilter.OPEN, "Open (${issues.count { !it.isClosed }})"),
+                                    Pair(IssueFilter.CLOSED, "Closed (${issues.count { it.isClosed }})")
+                                ).forEach { (opt, label) ->
+                                    val active = currentFilter == opt
+                                    Box(
+                                        modifier = Modifier
+                                            .clickable { onFilterChange(opt) }
+                                            .background(
+                                                if (active) MaterialTheme.colorScheme.secondaryContainer
+                                                else Color.Transparent
                                             )
-                                        }
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = AppFontSizes.extraSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (active) MaterialTheme.colorScheme.onSecondaryContainer
+                                            else MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
                                 }
                             }
                         }
                     }
                 }
-                
-                items(filteredIssues, key = { it.id }) { issue ->
-                    IssueCard(
-                        issue = issue,
-                        onToggle = { onToggleIssue(issue) },
-                        onDelete = { onDeleteIssue(issue) },
-                        onEdit = { itemToEdit = issue; showAddDialog = true },
-                        onAddComment = { comment -> onAddComment(issue, comment) }
-                    )
+
+                if (issues.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "No issues", modifier = Modifier.size(82.dp), tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            Text("No issues tracked yet", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                            Text("Tap the + button to add a new issue", fontSize = AppFontSizes.small, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                        }
+                    }
+                } else if (filteredIssues.isEmpty() && searchQuery.isNotEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Nothing matches my search", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
+                } else if (filteredIssues.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No issues match the current filter", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 85.dp, start = 16.dp, end = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredIssues, key = { it.id }) { issue ->
+                            IssueCard(
+                                issue = issue,
+                                onToggle = { onToggleIssue(issue) },
+                                onDelete = { onDeleteIssue(issue) },
+                                onEdit = { itemToEdit = issue; showAddDialog = true },
+                                onAddComment = { comment -> onAddComment(issue, comment) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -288,7 +317,7 @@ fun IssueCard(
     Card(
         modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
         shape = RoundedCornerShape(20.dp)
@@ -363,6 +392,19 @@ fun IssueCard(
                             fontSize = AppFontSizes.extraSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
+                        if (issue.isClosed && issue.closedTimestamp != null) {
+                            Text(
+                                text = "•",
+                                fontSize = AppFontSizes.extraSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            val closedCal = Calendar.getInstance().apply { timeInMillis = issue.closedTimestamp }
+                            Text(
+                                text = "Closed ${DateTimeUtils.formatHomeDateLabel(closedCal.time)}",
+                                fontSize = AppFontSizes.extraSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
                     }
 
                     if (issue.description.isNotBlank()) {
@@ -450,16 +492,24 @@ fun IssueCard(
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 issue.comments.forEachIndexed { index, comment ->
-                                    Row(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 8.dp, horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .padding(vertical = 8.dp, horizontal = 12.dp)
                                     ) {
                                         Text(
-                                            text = parseStyledDescription(comment),
+                                            text = parseStyledDescription(comment.text),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        val cCal = Calendar.getInstance().apply { timeInMillis = comment.timestamp }
+                                        val iCal = Calendar.getInstance().apply { timeInMillis = issue.timestamp }
+                                        val isSameDay = DateTimeUtils.isSameDay(cCal, iCal)
+                                        Text(
+                                            text = if (isSameDay) DateTimeUtils.formatAlarmTime(comment.timestamp) else "${DateTimeUtils.formatHomeDateLabel(cCal.time)}, ${DateTimeUtils.formatAlarmTime(comment.timestamp)}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                         )
                                     }
                                     if (index < issue.comments.size - 1) {
@@ -604,7 +654,7 @@ fun CategoryBadge(category: String) {
     Surface(
         color = color.copy(alpha = 0.2f),
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, color)
+        border = BorderStroke(1.5.dp, color)
     ) {
         Text(
             text = category,
@@ -632,9 +682,11 @@ fun IssueAddDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f),
             shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
+            color = MaterialTheme.colorScheme.dialogContainerColor,
+            tonalElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier.padding(24.dp).fillMaxWidth()
@@ -697,11 +749,10 @@ fun IssueAddDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    modifier = Modifier.fillMaxWidth().height(160.dp),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Next
+                        capitalization = KeyboardCapitalization.Sentences
                     )
                 )
 
@@ -780,7 +831,7 @@ private val previewIssues = listOf(
         category = "Issue",
         isClosed = false,
         timestamp = System.currentTimeMillis() - 86400000,
-        comments = listOf("Assigned to dev team", "Adding test logs...")
+        comments = listOf(IssueComment("Assigned to dev team"), IssueComment("Adding test logs..."))
     ),
     IssueItem(
         id = "2",
@@ -798,7 +849,7 @@ private val previewIssues = listOf(
         category = "Idea",
         isClosed = true,
         timestamp = System.currentTimeMillis() - 172800000L,
-        comments = listOf("Good idea, completed in v2.4")
+        comments = listOf(IssueComment("Good idea, completed in v2.4"))
     )
 )
 

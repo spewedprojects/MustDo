@@ -1136,7 +1136,7 @@ fun HomeScreenSimplePreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Task Item Card")
+@Preview(showBackground = true, name = "Task Item Card - Urgent")
 @Composable
 fun TaskItemCardPreview() {
     SoftTodoTheme(colorSchemeType = "colorful") {
@@ -1147,6 +1147,172 @@ fun TaskItemCardPreview() {
             onDelete = {},
             onLongClick = {},
             onToggleSubComplete = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Task Item Card - Completed")
+@Composable
+fun TaskItemCardCompletedPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[1],
+                colorSchemeType = "minimal",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Task Item Card - Low Priority")
+@Composable
+fun TaskItemCardLowPriorityPreview() {
+    SoftTodoTheme(colorSchemeType = "simple", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[3],
+                colorSchemeType = "simple",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "HomeScreen - Empty State", showSystemUi = true)
+@Composable
+fun HomeScreenEmptyStatePreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            colorSchemeType = "minimal",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = null,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
+            copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(emptyList()) }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "HomeScreen - Dark Mode", showSystemUi = true)
+@Composable
+fun HomeScreenDarkModePreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "dark") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            colorSchemeType = "minimal",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = null,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
+            copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "HomeScreen - Delete Dialog Visible", showSystemUi = true)
+@Composable
+fun HomeScreenDeleteDialogPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            colorSchemeType = "minimal",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = sampleTasks[0],
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
+            copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "HomeScreen - Colorful Dark Theme", showSystemUi = true)
+@Composable
+fun HomeScreenColorfulDarkThemePreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        HomeScreenContent(
+            currentDate = Calendar.getInstance(),
+            lastUsedPriority = 1,
+            colorSchemeType = "colorful",
+            showAddDialog = false,
+            taskToEdit = null,
+            taskToDelete = null,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
+            copiedTask = null,
+            customCategories = listOf("Work", "Errands", "Fitness"),
+            onShowAddDialogChange = {},
+            onTaskToEditChange = {},
+            onTaskToDeleteChange = {},
+            onNavigateDate = {},
+            onSetDate = {},
+            onToggleComplete = {},
+            onDeleteTask = {},
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onCopy = {},
+            onAddCustomCategory = {},
+            onDeleteCustomCategory = {},
+            onToggleSubComplete = { _, _ -> },
+            getTasksForDate = { _ -> kotlinx.coroutines.flow.flowOf(sampleTasks) }
         )
     }
 }

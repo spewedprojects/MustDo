@@ -30,6 +30,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gratus.mytodo.data.IssueItem
+import com.gratus.mytodo.data.IssueComment
 import com.gratus.mytodo.data.IssueTrackerRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,11 +87,12 @@ class IssueTrackerViewModel(application: Application) : AndroidViewModel(applica
     }
 
     fun toggleStatus(item: IssueItem) {
-        updateIssue(item.copy(isClosed = !item.isClosed))
+        val newClosedTimestamp = if (!item.isClosed) System.currentTimeMillis() else null
+        updateIssue(item.copy(isClosed = !item.isClosed, closedTimestamp = newClosedTimestamp))
     }
 
     fun addComment(item: IssueItem, comment: String) {
-        val newComments = item.comments + comment
+        val newComments = item.comments + IssueComment(comment)
         updateIssue(item.copy(comments = newComments))
     }
 

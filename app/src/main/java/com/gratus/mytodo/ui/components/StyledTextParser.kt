@@ -45,56 +45,7 @@ fun parseStyledDescription(text: String): AnnotatedString {
             line
         }
 
-        var i = 0
-        val lineLen = processedLine.length
-        while (i < lineLen) {
-            // Check customized tag match <**bold**> and <__italic__>
-            if (i <= lineLen - 4 && processedLine.substring(i, i + 3) == "<**") {
-                val endIdx = processedLine.indexOf("**>", i + 3)
-                if (endIdx != -1) {
-                    builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                    builder.append(processedLine.substring(i + 3, endIdx))
-                    builder.pop()
-                    i = endIdx + 3
-                    continue
-                }
-            }
-            if (i <= lineLen - 4 && processedLine.substring(i, i + 3) == "<__") {
-                val endIdx = processedLine.indexOf("__>", i + 3)
-                if (endIdx != -1) {
-                    builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                    builder.append(processedLine.substring(i + 3, endIdx))
-                    builder.pop()
-                    i = endIdx + 3
-                    continue
-                }
-            }
-
-            // Standard Markdown matching (**bold** and __italic__)
-            if (i <= lineLen - 3 && processedLine.substring(i, i + 2) == "**") {
-                val endIdx = processedLine.indexOf("**", i + 2)
-                if (endIdx != -1) {
-                    builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                    builder.append(processedLine.substring(i + 2, endIdx))
-                    builder.pop()
-                    i = endIdx + 2
-                    continue
-                }
-            }
-            if (i <= lineLen - 3 && processedLine.substring(i, i + 2) == "__") {
-                val endIdx = processedLine.indexOf("__", i + 2)
-                if (endIdx != -1) {
-                    builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                    builder.append(processedLine.substring(i + 2, endIdx))
-                    builder.pop()
-                    i = endIdx + 2
-                    continue
-                }
-            }
-
-            builder.append(processedLine[i])
-            i++
-        }
+        builder.append(parseInlineStyles(processedLine))
         
         // Maintain line breaks correctly
         if (index < lines.size - 1) {
@@ -102,5 +53,60 @@ fun parseStyledDescription(text: String): AnnotatedString {
         }
     }
     
+    return builder.toAnnotatedString()
+}
+
+private fun parseInlineStyles(text: String): AnnotatedString {
+    val builder = AnnotatedString.Builder()
+    var i = 0
+    val lineLen = text.length
+    while (i < lineLen) {
+        // Check customized tag match <**bold**> and <__italic__>
+        if (i <= lineLen - 4 && text.substring(i, i + 3) == "<**") {
+            val endIdx = text.indexOf("**>", i + 3)
+            if (endIdx != -1) {
+                builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                builder.append(parseInlineStyles(text.substring(i + 3, endIdx)))
+                builder.pop()
+                i = endIdx + 3
+                continue
+            }
+        }
+        if (i <= lineLen - 4 && text.substring(i, i + 3) == "<__") {
+            val endIdx = text.indexOf("__>", i + 3)
+            if (endIdx != -1) {
+                builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                builder.append(parseInlineStyles(text.substring(i + 3, endIdx)))
+                builder.pop()
+                i = endIdx + 3
+                continue
+            }
+        }
+
+        // Standard Markdown matching (**bold** and __italic__)
+        if (i <= lineLen - 3 && text.substring(i, i + 2) == "**") {
+            val endIdx = text.indexOf("**", i + 2)
+            if (endIdx != -1) {
+                builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                builder.append(parseInlineStyles(text.substring(i + 2, endIdx)))
+                builder.pop()
+                i = endIdx + 2
+                continue
+            }
+        }
+        if (i <= lineLen - 3 && text.substring(i, i + 2) == "__") {
+            val endIdx = text.indexOf("__", i + 2)
+            if (endIdx != -1) {
+                builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                builder.append(parseInlineStyles(text.substring(i + 2, endIdx)))
+                builder.pop()
+                i = endIdx + 2
+                continue
+            }
+        }
+
+        builder.append(text[i])
+        i++
+    }
     return builder.toAnnotatedString()
 }

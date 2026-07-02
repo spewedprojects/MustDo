@@ -22,6 +22,27 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+data class IssueComment(
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis()
+) {
+    fun toJson(): JSONObject {
+        val json = JSONObject()
+        json.put("text", text)
+        json.put("timestamp", timestamp)
+        return json
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): IssueComment {
+            return IssueComment(
+                text = json.getString("text"),
+                timestamp = json.optLong("timestamp", System.currentTimeMillis())
+            )
+        }
+    }
+}
+
 data class IssueItem(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -29,7 +50,8 @@ data class IssueItem(
     val category: String,
     val isClosed: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
-    val comments: List<String> = emptyList()
+    val closedTimestamp: Long? = null,
+    val comments: List<IssueComment> = emptyList()
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -39,9 +61,10 @@ data class IssueItem(
         json.put("category", category)
         json.put("isClosed", isClosed)
         json.put("timestamp", timestamp)
+        json.put("closedTimestamp", closedTimestamp)
         
         val commentsArray = JSONArray()
-        comments.forEach { commentsArray.put(it) }
+        comments.forEach { commentsArray.put(it.toJson()) }
         json.put("comments", commentsArray)
         
         return json
@@ -50,10 +73,18 @@ data class IssueItem(
     companion object {
         fun fromJson(json: JSONObject): IssueItem {
             val commentsArray = json.optJSONArray("comments")
-            val commentsList = mutableListOf<String>()
+            val commentsList = mutableListOf<IssueComment>()
             if (commentsArray != null) {
                 for (i in 0 until commentsArray.length()) {
-                    commentsList.add(commentsArray.getString(i))
+                    val obj = commentsArray.optJSONObject(i)
+                    if (obj != null) {
+                        commentsList.add(IssueComment.fromJson(obj))
+                    } else {
+                        val str = commentsArray.optString(i)
+                        if (str.isNotEmpty()) {
+                            commentsList.add(IssueComment(text = str, timestamp = json.optLong("timestamp", System.currentTimeMillis())))
+                        }
+                    }
                 }
             }
             
@@ -64,6 +95,7 @@ data class IssueItem(
                 category = json.getString("category"),
                 isClosed = json.getBoolean("isClosed"),
                 timestamp = json.getLong("timestamp"),
+                closedTimestamp = if (json.has("closedTimestamp") && !json.isNull("closedTimestamp")) json.getLong("closedTimestamp") else null,
                 comments = commentsList
             )
         }

@@ -399,11 +399,7 @@ fun YearView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = when (colorSchemeType) {
-                            "simple" -> MaterialTheme.colorScheme.surface
-                            "minimal" -> MaterialTheme.colorScheme.surface
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                        }
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
                     border = when (colorSchemeType) {
                         "simple" -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
@@ -535,11 +531,7 @@ fun MonthView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = when (colorSchemeType) {
-                            "simple" -> MaterialTheme.colorScheme.surface
-                            "minimal" -> MaterialTheme.colorScheme.surface
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                        }
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
                     border = when (colorSchemeType) {
                         "simple" -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
@@ -690,11 +682,7 @@ fun WeekView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = when (colorSchemeType) {
-                            "simple" -> MaterialTheme.colorScheme.surface
-                            "minimal" -> MaterialTheme.colorScheme.surface
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                        }
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
                     border = when (colorSchemeType) {
                         "simple" -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
@@ -850,11 +838,7 @@ fun ExpandedView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = when (colorSchemeType) {
-                            "simple" -> MaterialTheme.colorScheme.surface
-                            "minimal" -> MaterialTheme.colorScheme.surface
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-                        }
+                        containerColor = MaterialTheme.colorScheme.surface
                     ),
                     border = when (colorSchemeType) {
                         "simple" -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
@@ -1267,7 +1251,7 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
     }
 }
 
-@Preview(showBackground = true, name = "History Screen - Colorful Theme")
+@Preview(showBackground = true, name = "History Screen - Simple Light")
 @Composable
 fun HistoryScreenPreview() {
     SoftTodoTheme(colorSchemeType = "simple") {
@@ -1275,27 +1259,91 @@ fun HistoryScreenPreview() {
             tasks = sampleHistoryTasks,
             query = "",
             zoomLevel = 3,
-
             activeFilter = FilterOption.ALL,
             colorSchemeType = "simple",
             onQueryChange = {},
             onZoomChange = {},
             onZoomLevelSet = {},
-
             onFilterChange = {}
         )
     }
 }
 
-@Preview(showBackground = true, name = "Zoomable Task Row")
+@Preview(showBackground = true, name = "History Screen - Colorful Dark")
 @Composable
-fun ZoomableTaskRowPreview() {
-    SoftTodoTheme {
-        ZoomableTaskRow(
-            task = sampleHistoryTasks[0],
+fun HistoryScreenColorfulDarkPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks,
+            query = "",
             zoomLevel = 3,
-            colorSchemeType = "simple"
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "colorful",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {}
         )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Empty State")
+@Composable
+fun HistoryScreenEmptyPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        HistoryScreenContent(
+            tasks = emptyList(),
+            query = "",
+            zoomLevel = 3,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Zoomable Task Row - Level 1 (Compact)")
+@Composable
+fun ZoomableTaskRowLevel1Preview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            ZoomableTaskRow(
+                task = sampleHistoryTasks[0],
+                zoomLevel = 1,
+                colorSchemeType = "minimal"
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Zoomable Task Row - Level 2 (Medium)")
+@Composable
+fun ZoomableTaskRowLevel2Preview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            ZoomableTaskRow(
+                task = sampleHistoryTasks[0],
+                zoomLevel = 2,
+                colorSchemeType = "minimal"
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Zoomable Task Row - Level 3 (Detailed)")
+@Composable
+fun ZoomableTaskRowLevel3Preview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            ZoomableTaskRow(
+                task = sampleHistoryTasks[0],
+                zoomLevel = 3,
+                colorSchemeType = "minimal"
+            )
+        }
     }
 }
 

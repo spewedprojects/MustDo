@@ -220,8 +220,7 @@ fun TaskAddDialog(
                             .testTag("task_desc_input"),
                         shape = RoundedCornerShape(12.dp),
                         keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Sentences,
-                            imeAction = ImeAction.Done
+                            capitalization = KeyboardCapitalization.Sentences
                         )
                     )
 
