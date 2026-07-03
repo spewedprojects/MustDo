@@ -35,6 +35,7 @@ object DateTimeUtils {
     private val alarmTimeFormatter = ThreadLocal.withInitial { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
     private val alarmDateFormatter = ThreadLocal.withInitial { SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault()) }
     private val monthYearFormatter = ThreadLocal.withInitial { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
+    private val shortDateFormatter = ThreadLocal.withInitial { SimpleDateFormat("EEE, MMM dd, yyyy", Locale.getDefault()) }
 
     private val db get() = dbFormatter.get()!!
     private val mainHeader get() = mainHeaderFormatter.get()!!
@@ -45,6 +46,7 @@ object DateTimeUtils {
     private val alarmTime get() = alarmTimeFormatter.get()!!
     private val alarmDate get() = alarmDateFormatter.get()!!
     private val monthYear get() = monthYearFormatter.get()!!
+    private val shortDate get() = shortDateFormatter.get()!!
 
     fun formatDbDate(calendar: Calendar): String = db.format(calendar.time)
     fun formatDbDate(timeMillis: Long): String = db.format(Date(timeMillis))
@@ -55,6 +57,9 @@ object DateTimeUtils {
     
     fun formatHomeDateLabel(calendar: Calendar): String = homeDateLabel.format(calendar.time)
     fun formatHomeDateLabel(date: Date): String = homeDateLabel.format(date)
+    
+    fun formatShortDate(calendar: Calendar): String = shortDate.format(calendar.time)
+    fun formatShortDate(date: Date): String = shortDate.format(date)
     
     fun formatHistoryGroup(date: Date): String = historyGroup.format(date)
     

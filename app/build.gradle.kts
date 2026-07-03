@@ -14,8 +14,8 @@ android {
     applicationId = "com.gratus.mytodo"
     minSdk = 27
     targetSdk = 36
-    versionCode = 18
-    versionName = "6.4.0"
+    versionCode = 19
+    versionName = "6.4.1"
 
     // Pass versionName to the app as a resource
     resValue(
@@ -110,6 +110,7 @@ dependencies {
   implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
+  implementation(libs.androidx.compose.animation.core)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

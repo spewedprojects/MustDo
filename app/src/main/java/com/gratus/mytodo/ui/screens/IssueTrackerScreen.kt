@@ -20,12 +20,15 @@ package com.gratus.mytodo.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -36,7 +39,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.automirrored.filled.Comment
 import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gratus.mytodo.data.IssueItem
@@ -229,7 +232,7 @@ fun IssueTrackerScreenContent(
                                                 if (active) MaterialTheme.colorScheme.secondaryContainer
                                                 else Color.Transparent
                                             )
-                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                            .padding(horizontal = 6.dp, vertical = 6.dp)
                                     ) {
                                         Text(
                                             text = label,
@@ -255,7 +258,7 @@ fun IssueTrackerScreenContent(
                     }
                 } else if (filteredIssues.isEmpty() && searchQuery.isNotEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Nothing matches my search", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                        Text("No issues match your search", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
                     }
                 } else if (filteredIssues.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -313,9 +316,18 @@ fun IssueCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f)
+    val context = LocalContext.current
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .animateContentSize( // This handles the smooth expansion
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -335,29 +347,16 @@ fun IssueCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (issue.isClosed) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                Color.Transparent
-                            }
+                            if (issue.isClosed) MaterialTheme.colorScheme.primaryContainer
+                            else Color.Transparent
                         )
-                        .align(Alignment.Top)
                 ) {
-                    if (issue.isClosed) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Mark done status",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.RadioButtonUnchecked,
-                            contentDescription = "Mark done status",
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = if (issue.isClosed) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
+                        contentDescription = "Status",
+                        tint = if (issue.isClosed) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(if (issue.isClosed) 18.dp else 24.dp)
+                    )
                 }
 
                 Column(
@@ -365,30 +364,34 @@ fun IssueCard(
                         .weight(1f)
                         .padding(start = 6.dp)
                 ) {
-                    Text(
-                        text = issue.title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            textDecoration = if (issue.isClosed) TextDecoration.LineThrough else TextDecoration.None
-                        ),
-                        color = if (issue.isClosed) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = issue.title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                textDecoration = if (issue.isClosed) TextDecoration.LineThrough else TextDecoration.None
+                            ),
+                            color = if (issue.isClosed) { MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) } else { MaterialTheme.colorScheme.onSurface },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        CategoryBadge(category = issue.category)
+                    }
                     
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(vertical = 4.dp)
                     ) {
-                        CategoryBadge(category = issue.category)
                         val cal = Calendar.getInstance().apply { timeInMillis = issue.timestamp }
                         Text(
-                            text = DateTimeUtils.formatHomeDateLabel(cal.time),
+                            text = DateTimeUtils.formatShortDate(cal.time),
                             fontSize = AppFontSizes.extraSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -396,11 +399,12 @@ fun IssueCard(
                             Text(
                                 text = "•",
                                 fontSize = AppFontSizes.extraSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
                             val closedCal = Calendar.getInstance().apply { timeInMillis = issue.closedTimestamp }
                             Text(
-                                text = "Closed ${DateTimeUtils.formatHomeDateLabel(closedCal.time)}",
+                                text = "Closed ${DateTimeUtils.formatShortDate(closedCal.time)}",
                                 fontSize = AppFontSizes.extraSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
@@ -416,6 +420,33 @@ fun IssueCard(
                             maxLines = if (expanded) Int.MAX_VALUE else 4,
                             overflow = TextOverflow.Ellipsis
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    AnimatedVisibility(
+                        visible = !expanded && issue.comments.isNotEmpty(),
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ){
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Comment,
+                                modifier = Modifier.size(20.dp),
+                                contentDescription = "Comments",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "(${issue.comments.size})",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
                     }
                 }
 
@@ -507,7 +538,7 @@ fun IssueCard(
                                         val iCal = Calendar.getInstance().apply { timeInMillis = issue.timestamp }
                                         val isSameDay = DateTimeUtils.isSameDay(cCal, iCal)
                                         Text(
-                                            text = if (isSameDay) DateTimeUtils.formatAlarmTime(comment.timestamp) else "${DateTimeUtils.formatHomeDateLabel(cCal.time)}, ${DateTimeUtils.formatAlarmTime(comment.timestamp)}",
+                                            text = if (isSameDay) DateTimeUtils.formatAlarmTime(context, comment.timestamp) else "${DateTimeUtils.formatShortDate(cCal.time)}, ${DateTimeUtils.formatAlarmTime(context, comment.timestamp)}",
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                         )
