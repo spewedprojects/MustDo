@@ -19,10 +19,13 @@
 package com.gratus.mytodo.ui.components
 
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextIndent
+import androidx.compose.ui.unit.sp
 
 /**
  * Parses user input to create rich Styled Text strings.
@@ -36,23 +39,52 @@ fun parseStyledDescription(text: String): AnnotatedString {
     
     lines.forEachIndexed { index, line ->
         val trimmed = line.trimStart()
-        val isBullet = trimmed.startsWith("- ")
         
-        // Convert "- " bullet points into visually structured elements
-        val processedLine = if (isBullet) {
-            "  • " + trimmed.substring(2)
-        } else {
-            line
+        // Count consecutive dashes at the start of the trimmed line
+        var dashCount = 0
+        while (dashCount < trimmed.length && trimmed[dashCount] == '-') {
+            dashCount++
         }
 
-        builder.append(parseInlineStyles(processedLine))
-        
-        // Maintain line breaks correctly
-        if (index < lines.size - 1) {
-            builder.append("\n")
+        // Must have at least one dash followed by a space
+        val isBullet = dashCount > 0 && dashCount < trimmed.length && trimmed[dashCount] == ' '
+
+        if (isBullet) {
+            val baseIndentValue = (dashCount - 1) * 16
+            val baseIndent = baseIndentValue.sp
+            val indentSize = (baseIndentValue + 12).sp
+            
+            // Choose bullet character based on level
+            val bulletChar = when (dashCount) {
+                1 -> "•"
+                2 -> "•"
+                3 -> "◦"
+                else -> "▪"
+            }
+
+            // Apply ParagraphStyle for the entire line to handle wrapping
+            builder.pushStyle(
+                ParagraphStyle(
+                    // firstLine puts the bullet at the current indentation level
+                    // restLine pushes wrapped lines in further to align with text
+                    textIndent = TextIndent(firstLine = baseIndent, restLine = indentSize)
+                )
+            )
+
+            // Append the bullet and the rest of the text
+            builder.append("$bulletChar  ")
+            builder.append(parseInlineStyles(trimmed.substring(dashCount + 1)))
+
+            builder.pop() // Remove ParagraphStyle
+        } else {
+            builder.append(parseInlineStyles(line))
         }
+
+//        if (index < lines.size - 1) {
+//            builder.append("\n")
+//        }
     }
-    
+
     return builder.toAnnotatedString()
 }
 

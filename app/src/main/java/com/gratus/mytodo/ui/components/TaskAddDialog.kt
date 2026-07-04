@@ -1343,7 +1343,7 @@ fun TaskAddDialog(
                 }
             },
             shape = RoundedCornerShape(28.dp),
-            tonalElevation = 6.dp
+            tonalElevation = 0.dp
         ) {
             // We use a Column to wrap the picker to prevent the layout from "warping"
             // within the Dialog's constraints.

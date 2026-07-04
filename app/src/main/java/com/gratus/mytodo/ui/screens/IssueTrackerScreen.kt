@@ -59,6 +59,10 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.automirrored.filled.Comment
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gratus.mytodo.data.IssueItem
@@ -118,8 +122,8 @@ fun IssueTrackerScreenContent(
     onAddComment: (IssueItem, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showAddDialog by remember { mutableStateOf(false) }
-    var itemToEdit by remember { mutableStateOf<IssueItem?>(null) }
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var itemToEditId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val filteredIssues = issues.filter {
         val matchesFilter = when (currentFilter) {
@@ -276,7 +280,7 @@ fun IssueTrackerScreenContent(
                                 issue = issue,
                                 onToggle = { onToggleIssue(issue) },
                                 onDelete = { onDeleteIssue(issue) },
-                                onEdit = { itemToEdit = issue; showAddDialog = true },
+                                onEdit = { itemToEditId = issue.id; showAddDialog = true },
                                 onAddComment = { comment -> onAddComment(issue, comment) }
                             )
                         }
@@ -287,20 +291,21 @@ fun IssueTrackerScreenContent(
     }
 
     if (showAddDialog) {
+        val itemToEdit = issues.find { it.id == itemToEditId }
         IssueAddDialog(
             initialItem = itemToEdit,
             onDismiss = {
                 showAddDialog = false
-                itemToEdit = null
+                itemToEditId = null
             },
             onSave = { title, desc, cat ->
                 if (itemToEdit != null) {
-                    onUpdateIssue(itemToEdit!!.copy(title = title, description = desc, category = cat))
+                    onUpdateIssue(itemToEdit.copy(title = title, description = desc, category = cat))
                 } else {
                     onAddIssue(title, desc, cat)
                 }
                 showAddDialog = false
-                itemToEdit = null
+                itemToEditId = null
             }
         )
     }
@@ -340,22 +345,30 @@ fun IssueCard(
                 verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Mark Completed icon button (replicated from HomeScreen's TaskItemCard)
-                IconButton(
-                    onClick = onToggle,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (issue.isClosed) MaterialTheme.colorScheme.primaryContainer
-                            else Color.Transparent
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (issue.isClosed) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
-                        contentDescription = "Status",
-                        tint = if (issue.isClosed) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(if (issue.isClosed) 18.dp else 24.dp)
+                Column (
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ){
+                    // Mark Completed icon button (replicated from HomeScreen's TaskItemCard)
+                    IconButton(
+                        onClick = onToggle,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (issue.isClosed) MaterialTheme.colorScheme.primaryContainer
+                                else Color.Transparent
+                            )
+                    ) { Icon(
+                            imageVector = if (issue.isClosed) Icons.Default.Check else Icons.Default.RadioButtonUnchecked,
+                            contentDescription = "Status",
+                            tint = if (issue.isClosed) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(if (issue.isClosed) 18.dp else 24.dp)
+                        ) }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "#${issue.serialNumber}",
+                        fontSize = AppFontSizes.extraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (issue.isClosed) 0.5f else 0.8f),
                     )
                 }
 
@@ -386,8 +399,7 @@ fun IssueCard(
                     
                     Row(
                         horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         val cal = Calendar.getInstance().apply { timeInMillis = issue.timestamp }
                         Text(
@@ -404,7 +416,12 @@ fun IssueCard(
                             )
                             val closedCal = Calendar.getInstance().apply { timeInMillis = issue.closedTimestamp }
                             Text(
-                                text = "Closed ${DateTimeUtils.formatShortDate(closedCal.time)}",
+                                text = buildAnnotatedString {
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("Closed ")
+                                    }
+                                    append(DateTimeUtils.formatShortDate(closedCal.time))
+                                },
                                 fontSize = AppFontSizes.extraSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
@@ -412,7 +429,7 @@ fun IssueCard(
                     }
 
                     if (issue.description.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = parseStyledDescription(issue.description),
                             style = MaterialTheme.typography.bodySmall,
@@ -422,7 +439,7 @@ fun IssueCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     AnimatedVisibility(
                         visible = !expanded && issue.comments.isNotEmpty(),
@@ -705,9 +722,9 @@ fun IssueAddDialog(
     onSave: (title: String, description: String, category: String) -> Unit
 ) {
     val context = LocalContext.current
-    var title by remember { mutableStateOf(initialItem?.title ?: "") }
-    var description by remember { mutableStateOf(TextFieldValue(initialItem?.description ?: "")) }
-    var category by remember { mutableStateOf(initialItem?.category ?: "Issue") }
+    var title by rememberSaveable { mutableStateOf(initialItem?.title ?: "") }
+    var description by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(initialItem?.description ?: "")) }
+    var category by rememberSaveable { mutableStateOf(initialItem?.category ?: "Issue") }
     
     val categories = listOf("Issue", "Feature", "Idea")
 
@@ -780,7 +797,7 @@ fun IssueAddDialog(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Description") },
-                    modifier = Modifier.fillMaxWidth().height(160.dp),
+                    modifier = Modifier.fillMaxWidth().height(180.dp),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences
@@ -856,7 +873,8 @@ fun IssueAddDialog(
 
 private val previewIssues = listOf(
     IssueItem(
-        id = "1",
+        id = "1342",
+        serialNumber = 3,
         title = "Fix crash on login screen",
         description = "NullPointerException when tapping login button rapidly.\n- Reproducible on Android 12\n- Need to check login flow thread locks.",
         category = "Issue",
@@ -865,7 +883,8 @@ private val previewIssues = listOf(
         comments = listOf(IssueComment("Assigned to dev team"), IssueComment("Adding test logs..."))
     ),
     IssueItem(
-        id = "2",
+        id = "23254",
+        serialNumber = 2,
         title = "Implement biometric authentication",
         description = "Allow users to log in using fingerprint or face unlock for faster access.",
         category = "Feature",
@@ -874,7 +893,8 @@ private val previewIssues = listOf(
         comments = emptyList()
     ),
     IssueItem(
-        id = "3",
+        id = "35342",
+        serialNumber = 1,
         title = "Snooze presets customization",
         description = "Idea to allow users to edit custom snooze duration presets in settings.",
         category = "Idea",

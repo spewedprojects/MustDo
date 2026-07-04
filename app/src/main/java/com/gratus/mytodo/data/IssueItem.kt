@@ -45,6 +45,7 @@ data class IssueComment(
 
 data class IssueItem(
     val id: String = UUID.randomUUID().toString(),
+    val serialNumber: Int,
     val title: String,
     val description: String,
     val category: String,
@@ -56,6 +57,7 @@ data class IssueItem(
     fun toJson(): JSONObject {
         val json = JSONObject()
         json.put("id", id)
+        json.put("serialNumber", serialNumber)
         json.put("title", title)
         json.put("description", description)
         json.put("category", category)
@@ -90,6 +92,7 @@ data class IssueItem(
             
             return IssueItem(
                 id = json.getString("id"),
+                serialNumber = json.optInt("serialNumber", 0),
                 title = json.getString("title"),
                 description = json.getString("description"),
                 category = json.getString("category"),

@@ -21,7 +21,6 @@ package com.gratus.mytodo
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.ImageButton
@@ -75,8 +74,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
+import androidx.compose.material.icons.automirrored.filled.Sort
 
 /**
  * MainActivity is the host core of the Soft To-Do application.
@@ -319,7 +317,7 @@ fun MainLayoutContent(
                                     modifier = Modifier.testTag("sort_tasks_button")
                                 ) {
                                     Icon(
-                                        imageVector = if (sortOption == SortOption.PRIORITY) Icons.Default.SortByAlpha else Icons.Default.Sort,
+                                        imageVector = if (sortOption == SortOption.PRIORITY) Icons.Default.LowPriority else Icons.AutoMirrored.Filled.Sort,
                                         contentDescription = "Toggle Sort Mode",
                                         tint = MaterialTheme.colorScheme.primary
                                     )

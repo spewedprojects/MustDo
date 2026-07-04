@@ -59,13 +59,36 @@ class IssueTrackerViewModel(application: Application) : AndroidViewModel(applica
 
     private fun loadIssues() {
         viewModelScope.launch {
-            _issues.value = repository.getIssues()
+            val loadedIssues = repository.getIssues()
+
+            // Check if any existing issues have the default serialNumber 0
+            if (loadedIssues.isNotEmpty() && loadedIssues.any { it.serialNumber == 0 }) {
+                val migratedIssues = migrateExistingIssues(loadedIssues)
+                _issues.value = migratedIssues
+                repository.saveIssues(migratedIssues)
+            } else {
+                _issues.value = loadedIssues
+            }
+        }
+    }
+
+    private fun migrateExistingIssues(oldList: List<IssueItem>): List<IssueItem> {
+        // 1. Sort by timestamp so the oldest issue gets #1
+        // 2. Map through and assign indices + 1
+        return oldList.sortedBy { it.timestamp }.mapIndexed { index, item ->
+            if (item.serialNumber == 0) {
+                item.copy(serialNumber = index + 1)
+            } else {
+                item
+            }
         }
     }
 
     fun addIssue(title: String, description: String, category: String) {
+        val currentMaxNumber = _issues.value.maxOfOrNull { it.serialNumber } ?: 0
         val newItem = IssueItem(
             title = title,
+            serialNumber = currentMaxNumber + 1,
             description = description,
             category = category
         )
