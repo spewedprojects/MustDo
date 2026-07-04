@@ -18,6 +18,7 @@
 
 package com.gratus.mytodo.ui.screens
 
+import android.R
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
@@ -60,6 +61,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -132,7 +134,10 @@ fun IssueTrackerScreenContent(
             IssueFilter.CLOSED -> it.isClosed
         }
         val matchesSearch = it.title.contains(searchQuery, ignoreCase = true) || 
-                            it.description.contains(searchQuery, ignoreCase = true)
+                it.description.contains(searchQuery, ignoreCase = true) ||
+                it.serialNumber.toString() == searchQuery || // Exact match for ID
+                "#${it.serialNumber}".contains(searchQuery, ignoreCase = true) || // Match for "#12"
+                it.appVersion?.contains(searchQuery, ignoreCase = true) == true
         matchesFilter && matchesSearch
     }.sortedByDescending { it.timestamp }
 
@@ -317,9 +322,10 @@ fun IssueCard(
     onToggle: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
-    onAddComment: (String) -> Unit
+    onAddComment: (String) -> Unit,
+    initialExpanded: Boolean = false
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(initialExpanded) }
     val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f)
     val context = LocalContext.current
 
@@ -479,7 +485,12 @@ fun IssueCard(
             }
 
             if (expanded) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = issue.appVersion ?: stringResource(com.gratus.mytodo.R.string.app_version),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.align(Alignment.End),
+                )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(12.dp))
                 
@@ -823,7 +834,8 @@ fun IssueAddDialog(
                     }) {
                         Icon(Icons.Default.FormatBold, contentDescription = "Bold")
                     }
-                    IconButton(onClick = {
+                    IconButton(
+                        onClick = {
                         val text = description.text
                         val selection = description.selection
                         if (selection.start != selection.end) {
@@ -957,6 +969,23 @@ fun IssueCardOpenPreview() {
                 onDelete = {},
                 onEdit = {},
                 onAddComment = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Issue Card - Expanded")
+@Composable
+fun IssueCardExpandedPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            IssueCard(
+                issue = previewIssues[0],
+                onToggle = {},
+                onDelete = {},
+                onEdit = {},
+                onAddComment = {},
+                initialExpanded = true
             )
         }
     }

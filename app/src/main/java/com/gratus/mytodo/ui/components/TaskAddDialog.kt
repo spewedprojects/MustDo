@@ -254,18 +254,17 @@ fun TaskAddDialog(
                                     val selectedText = text.substring(selection.start, selection.end)
                                     val formatted = "**$selectedText**"
                                     val newText = text.replaceRange(selection.start, selection.end, formatted)
-                                    val head = selection.start + 3
+                                    // Fix: Offset by 2 (for "**") and maintain selection length
                                     descriptionValue = TextFieldValue(
                                         text = newText,
-                                        selection = TextRange(head, head + selectedText.length)
-                                    )
+                                        selection = TextRange(selection.start + 2, selection.start + 2 + selectedText.length))
                                 } else {
                                     Toast.makeText(context, "Select description text to format bold", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Text("B", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.FormatBold, contentDescription = "Bold", tint = MaterialTheme.colorScheme.primary)
                         }
 
                         // Italic Button
@@ -277,18 +276,17 @@ fun TaskAddDialog(
                                     val selectedText = text.substring(selection.start, selection.end)
                                     val formatted = "__${selectedText}__"
                                     val newText = text.replaceRange(selection.start, selection.end, formatted)
-                                    val head = selection.start + 3
+                                    // Fix: Offset by 2 (for "__") and maintain selection length
                                     descriptionValue = TextFieldValue(
                                         text = newText,
-                                        selection = TextRange(head, head + selectedText.length)
-                                    )
+                                        selection = TextRange(selection.start + 2, selection.start + 2 + selectedText.length))
                                 } else {
                                     Toast.makeText(context, "Select description text to format italic", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Text("I", fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.FormatItalic, contentDescription = "Italic", tint = MaterialTheme.colorScheme.primary)
                         }
 
                         // Short-cut for Bullet Point insertion at cursor position
@@ -306,9 +304,8 @@ fun TaskAddDialog(
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.List,
+                                imageVector = Icons.Default.FormatListBulleted,
                                 contentDescription = "Insert Bullet Point",
-                                modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }

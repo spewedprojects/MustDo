@@ -83,14 +83,19 @@ class IssueTrackerViewModel(application: Application) : AndroidViewModel(applica
             }
         }
     }
-
     fun addIssue(title: String, description: String, category: String) {
         val currentMaxNumber = _issues.value.maxOfOrNull { it.serialNumber } ?: 0
+        val appVersionStr = try {
+            getApplication<Application>().getString(com.gratus.mytodo.R.string.app_version)
+        } catch (e: Exception) {
+            "Unknown"
+        }
         val newItem = IssueItem(
             title = title,
             serialNumber = currentMaxNumber + 1,
             description = description,
-            category = category
+            category = category,
+            appVersion = appVersionStr
         )
         val updatedList = listOf(newItem) + _issues.value
         _issues.value = updatedList

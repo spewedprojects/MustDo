@@ -52,7 +52,8 @@ data class IssueItem(
     val isClosed: Boolean = false,
     val timestamp: Long = System.currentTimeMillis(),
     val closedTimestamp: Long? = null,
-    val comments: List<IssueComment> = emptyList()
+    val comments: List<IssueComment> = emptyList(),
+    val appVersion: String? = null
 ) {
     fun toJson(): JSONObject {
         val json = JSONObject()
@@ -64,6 +65,7 @@ data class IssueItem(
         json.put("isClosed", isClosed)
         json.put("timestamp", timestamp)
         json.put("closedTimestamp", closedTimestamp)
+        json.put("appVersion", appVersion)
         
         val commentsArray = JSONArray()
         comments.forEach { commentsArray.put(it.toJson()) }
@@ -99,7 +101,8 @@ data class IssueItem(
                 isClosed = json.getBoolean("isClosed"),
                 timestamp = json.getLong("timestamp"),
                 closedTimestamp = if (json.has("closedTimestamp") && !json.isNull("closedTimestamp")) json.getLong("closedTimestamp") else null,
-                comments = commentsList
+                comments = commentsList,
+                appVersion = if (json.has("appVersion") && !json.isNull("appVersion")) json.getString("appVersion") else null
             )
         }
     }

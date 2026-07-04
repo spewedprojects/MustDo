@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 fun parseStyledDescription(text: String): AnnotatedString {
     val builder = AnnotatedString.Builder()
     val lines = text.split("\n")
+    var prevIsBullet = false
     
     lines.forEachIndexed { index, line ->
         val trimmed = line.trimStart()
@@ -50,7 +51,7 @@ fun parseStyledDescription(text: String): AnnotatedString {
         val isBullet = dashCount > 0 && dashCount < trimmed.length && trimmed[dashCount] == ' '
 
         if (isBullet) {
-            val baseIndentValue = (dashCount - 1) * 16
+            val baseIndentValue = (dashCount - 1) * 12
             val baseIndent = baseIndentValue.sp
             val indentSize = (baseIndentValue + 12).sp
             
@@ -71,18 +72,31 @@ fun parseStyledDescription(text: String): AnnotatedString {
                 )
             )
 
+            if (index > 0) {
+                builder.pushStyle(SpanStyle(fontSize = 0.sp))
+                builder.append("\n")
+                builder.pop()
+            }
+
             // Append the bullet and the rest of the text
             builder.append("$bulletChar  ")
             builder.append(parseInlineStyles(trimmed.substring(dashCount + 1)))
 
             builder.pop() // Remove ParagraphStyle
         } else {
+            if (index > 0) {
+                if (prevIsBullet) {
+                    builder.pushStyle(SpanStyle(fontSize = 0.sp))
+                    builder.append("\n")
+                    builder.pop()
+                } else {
+                    builder.append("\n")
+                }
+            }
             builder.append(parseInlineStyles(line))
         }
 
-//        if (index < lines.size - 1) {
-//            builder.append("\n")
-//        }
+        prevIsBullet = isBullet
     }
 
     return builder.toAnnotatedString()
