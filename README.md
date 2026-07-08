@@ -1,21 +1,97 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+    <img width="200" src="docs/icon.svg" alt="GHBanner"/>
+    <p></p>
+    <h1>MustDo</h1>
+
 </div>
 
-# Run and deploy your AI Studio app
+A simple task application that is lightweight and does exactly what a To-do list must do.
+It additionally comes with a notification and alarm system. All wrapped in multiple color schemes compatible in both light and dark modes.
 
-This contains everything you need to run your app locally.
+**No ads • No subscriptions • No tracking • Completely free**
 
-View your app in AI Studio: https://ai.studio/apps/49ae948c-8cc8-44b6-a321-bda031e94901
+---
 
-## Run Locally
+## Screenshots (To be updated)
+Home screen
+<table>
+  <tr>
+    <td><img src="docs/screenshots/01.png" width="100%"></td>
+    <td><img src="docs/screenshots/02.png" width="100%"></td>
+    <td><img src="docs/screenshots/03.png" width="100%"></td>
+  </tr>
+</table>
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+Task Add Dialog and Edit Dialog
+<table>
+  <tr>
+    <td><img src="docs/screenshots/04.png" width="100%"></td>
+    <td><img src="docs/screenshots/05.png" width="100%"></td>
+    <td><img src="docs/screenshots/06.png" width="100%"></td>
+    <td><img src="docs/screenshots/07.png" width="100%"></td>
+  </tr>
+</table>
 
+History Screen - Day, Week, Month and Year view
+<table>
+  <tr>
+    <td><img src="docs/screenshots/09.png" width="100%"></td>
+    <td><img src="docs/screenshots/10.png" width="100%"></td>
+    <td><img src="docs/screenshots/11.png" width="100%"></td>
+    <td><img src="docs/screenshots/12.png" width="100%"></td>
+  </tr>
+</table>
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+Stats Screen - Non-interactive
+<table>
+  <tr>
+    <td><img src="docs/screenshots/13.png" width="25%"></td>
+  </tr>
+</table>
+
+Settings Screen and Drawer
+<table>
+  <tr>
+    <td><img src="docs/screenshots/14.png" width="100%"></td>
+    <td><img src="docs/screenshots/15.png" width="100%"></td>
+    <td><img src="docs/screenshots/16.png" width="100%"></td>
+  </tr>
+</table>
+
+Themes and Color schemes - Light/Dark
+<table>
+  <tr>
+  <th>Light Mode</th>
+    <td><img src="docs/screenshots/19.png" width="100%"></td>
+    <td><img src="docs/screenshots/18.png" width="100%"></td>
+    <td><img src="docs/screenshots/17.png" width="100%"></td>
+    <td><img src="docs/screenshots/15.png" width="100%"></td>
+  </tr>
+  <tr>
+  <th>Dark Mode</th>
+    <td><img src="docs/screenshots/20.png" width="100%"></td>
+    <td><img src="docs/screenshots/21.png" width="100%"></td>
+    <td><img src="docs/screenshots/22.png" width="100%"></td>
+    <td><img src="docs/screenshots/23.png" width="100%"></td>
+  </tr>
+</table>
+
+---
+
+## Features
+
+- Add a task/todo
+- Set to notify or ring alarm via scheduling
+- Repeat scheduled task
+- Repeat a singular task over multiple days while creating.
+- Copy/Paste task
+- Check consistency, task completion rate and 7-day rolling chart.
+- Set custom alarm tone, theme
+- Ability to Back up and Restore your task data.
+- A history view to see all you past tasks at a glance - can switch between daily, weekly, monthly and yearly views.
+
+---
+
+## Getting Started
+- Its quite self-explanatory
+---
