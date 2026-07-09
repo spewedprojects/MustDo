@@ -100,6 +100,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _settingsColorScheme = MutableStateFlow(sharedPrefs.getString("color_scheme", "minimal") ?: "minimal")
     val settingsColorScheme: StateFlow<String> = _settingsColorScheme.asStateFlow()
 
+    private val _colorfulHueShift = MutableStateFlow(sharedPrefs.getFloat("colorful_hue_shift", 0f))
+    val colorfulHueShift: StateFlow<Float> = _colorfulHueShift.asStateFlow()
+
+    private val _colorfulSatScale = MutableStateFlow(sharedPrefs.getFloat("colorful_sat_scale", 1.0f))
+    val colorfulSatScale: StateFlow<Float> = _colorfulSatScale.asStateFlow()
+
     private val _lastUsedPriority = MutableStateFlow(sharedPrefs.getInt("last_priority", 1))
     val lastUsedPriority: StateFlow<Int> = _lastUsedPriority.asStateFlow()
 
@@ -567,6 +573,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setColorScheme(scheme: String) {
         _settingsColorScheme.value = scheme
         sharedPrefs.edit().putString("color_scheme", scheme).apply()
+    }
+
+    fun setColorfulHueShift(shift: Float) {
+        _colorfulHueShift.value = shift
+        sharedPrefs.edit().putFloat("colorful_hue_shift", shift).apply()
+    }
+
+    fun setColorfulSatScale(scale: Float) {
+        _colorfulSatScale.value = scale
+        sharedPrefs.edit().putFloat("colorful_sat_scale", scale).apply()
     }
 
     /**

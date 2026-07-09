@@ -23,6 +23,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
@@ -39,19 +40,104 @@ private val FallbackLightColorScheme = lightColorScheme(
     tertiary = Pink40
 )
 
+/**
+ * CompositionLocal flag indicating whether the active scheme is "colorful".
+ * Used by [dialogContainerColor] to choose a solid overlay background instead of
+ * pattern-matching on Color instances (which breaks when hue/sat is shifted).
+ */
+val LocalIsColorfulScheme = staticCompositionLocalOf { false }
+
+/**
+ * Shifts the hue and scales the saturation of this Color in HSV space,
+ * preserving the original alpha so that glassmorphism card alphas survive the shift.
+ *
+ * @param hueDelta Degrees to rotate the hue (positive = clockwise, range typically ±30°).
+ * @param satScale Multiplier applied to the saturation channel (range typically 0.7–1.3).
+ */
+fun Color.shiftHueSat(hueDelta: Float, satScale: Float): Color {
+    if (hueDelta == 0f && satScale == 1f) return this
+    val hsv = floatArrayOf(0f, 0f, 0f)
+    android.graphics.Color.RGBToHSV(
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
+        hsv
+    )
+    hsv[0] = (hsv[0] + hueDelta + 360f) % 360f
+    hsv[1] = (hsv[1] * satScale).coerceIn(0f, 1f)
+    val argb = android.graphics.Color.HSVToColor(hsv)
+    // Preserve original alpha (critical for semi-transparent card colors)
+    return Color(argb).copy(alpha = this.alpha)
+}
+
+/**
+ * Builds a complete light or dark colorful ColorScheme, applying hue and saturation
+ * adjustments uniformly to every color so the inter-color relationships are preserved.
+ *
+ * @param isDark Whether to build the dark variant.
+ * @param hueShift Hue rotation in degrees (default 0 = original curated palette).
+ * @param satScale Saturation multiplier (default 1.0 = original curated palette).
+ */
+fun buildColorfulColorScheme(isDark: Boolean, hueShift: Float, satScale: Float): ColorScheme {
+    return if (isDark) {
+        darkColorScheme(
+            primary   = ColorfulDarkPrimary.shiftHueSat(hueShift, satScale),
+            onPrimary = SimpleLightBg,
+            secondary = ColorfulDarkSecondary.shiftHueSat(hueShift, satScale),
+            tertiary  = ColorfulDarkTertiary.shiftHueSat(hueShift, satScale),
+            background = ColorfulDarkBg.shiftHueSat(hueShift, satScale),
+            onBackground = ColorfulDarkOnBg,
+            surface   = ColorfulDarkCard.shiftHueSat(hueShift, satScale),
+            onSurface = ColorfulDarkOnBg,
+            outline   = ColorfulDarkOnBg.copy(alpha = 0.2f)
+        )
+    } else {
+        lightColorScheme(
+            primary   = ColorfulLightPrimary.shiftHueSat(hueShift, satScale),
+            onPrimary = SimpleLightBg,
+            secondary = ColorfulLightSecondary.shiftHueSat(hueShift, satScale),
+            tertiary  = ColorfulLightTertiary.shiftHueSat(hueShift, satScale),
+            background = ColorfulLightBg.shiftHueSat(hueShift, satScale),
+            onBackground = ColorfulLightOnBg,
+            surface   = ColorfulLightCard.shiftHueSat(hueShift, satScale),
+            onSurface = ColorfulLightOnBg,
+            outline   = ColorfulLightOnBg.copy(alpha = 0.1f)
+        )
+    }
+}
+
+/**
+ * Computes the solid-background dialog color for the colorful scheme.
+ * Applies the same hue/sat shift to the opaque card color (Card2 variants).
+ */
+fun colorfulDialogContainerColor(isDark: Boolean, hueShift: Float, satScale: Float): Color =
+    if (isDark) ColorfulDarkCard2.shiftHueSat(hueShift, satScale)
+    else ColorfulLightCard2.shiftHueSat(hueShift, satScale)
+
+/**
+ * Application-wide CompositionLocal carrying the solid dialog background color
+ * resolved for the current theme.  Defaults to Color.Unspecified so that
+ * components not wrapped by SoftTodoTheme degrade gracefully.
+ */
+val LocalDialogContainerColor = staticCompositionLocalOf { Color.Unspecified }
+
 @Composable
 fun SoftTodoTheme(
     themeMode: String = "auto",
     colorSchemeType: String = "minimal",
+    colorfulHueShift: Float = 0f,
+    colorfulSatScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
     val isDark = when (themeMode) {
         "light" -> false
-        "dark" -> true
-        else -> isSystemInDarkTheme()
+        "dark"  -> true
+        else    -> isSystemInDarkTheme()
     }
 
     val context = LocalContext.current
+    val isColorful = colorSchemeType == "colorful"
+
     val colorScheme = when (colorSchemeType) {
         "minimal" -> {
             if (isDark) {
@@ -135,33 +221,7 @@ fun SoftTodoTheme(
                 )
             }
         }
-        "colorful" -> {
-            if (isDark) {
-                darkColorScheme(
-                    primary = ColorfulDarkPrimary,
-                    onPrimary = SimpleLightBg,
-                    secondary = ColorfulDarkSecondary,
-                    tertiary = ColorfulDarkTertiary,
-                    background = ColorfulDarkBg,
-                    onBackground = ColorfulDarkOnBg,
-                    surface = ColorfulDarkCard,
-                    onSurface = ColorfulDarkOnBg,
-                    outline = ColorfulDarkOnBg.copy(alpha = 0.2f)
-                )
-            } else {
-                lightColorScheme(
-                    primary = ColorfulLightPrimary,
-                    onPrimary = SimpleLightBg,
-                    secondary = ColorfulLightSecondary,
-                    tertiary = ColorfulLightTertiary,
-                    background = ColorfulLightBg,
-                    onBackground = ColorfulLightOnBg,
-                    surface = ColorfulLightCard,
-                    onSurface = ColorfulLightOnBg,
-                    outline = ColorfulLightOnBg.copy(alpha = 0.1f)
-                )
-            }
-        }
+        "colorful" -> buildColorfulColorScheme(isDark, colorfulHueShift, colorfulSatScale)
         "system" -> {
             // Dynamic theme support (Android 12+) or traditional light/dark M3
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -173,17 +233,33 @@ fun SoftTodoTheme(
         else -> FallbackLightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
-}
-
-val ColorScheme.dialogContainerColor: Color
-    get() = when (this.surface) {
-        ColorfulDarkCard -> ColorfulDarkCard2
-        ColorfulLightCard -> ColorfulLightCard2
-        else -> this.surface
+    // Resolve the correct solid dialog background once and expose it via CompositionLocal
+    val dialogBg = if (isColorful) {
+        colorfulDialogContainerColor(isDark, colorfulHueShift, colorfulSatScale)
+    } else {
+        colorScheme.surface
     }
 
+    CompositionLocalProvider(
+        LocalIsColorfulScheme provides isColorful,
+        LocalDialogContainerColor provides dialogBg
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
+}
+
+/**
+ * Returns a solid background suitable for dialogs and dropdown menus.
+ * For the colorful scheme, this is the shifted opaque Card2 color;
+ * for all other schemes it is [ColorScheme.surface].
+ *
+ * Uses [LocalDialogContainerColor] which is set by [SoftTodoTheme], so it correctly
+ * reflects any active hue/saturation shift without fragile Color identity matching.
+ */
+val ColorScheme.dialogContainerColor: Color
+    @Composable get() = LocalDialogContainerColor.current.takeIf { it != Color.Unspecified }
+        ?: this.surface

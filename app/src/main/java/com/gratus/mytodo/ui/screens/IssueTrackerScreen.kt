@@ -71,7 +71,6 @@ import com.gratus.mytodo.data.IssueItem
 import com.gratus.mytodo.data.IssueComment
 import com.gratus.mytodo.ui.IssueFilter
 import com.gratus.mytodo.ui.IssueTrackerViewModel
-import com.gratus.mytodo.ui.components.FaintBackground
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
@@ -141,8 +140,7 @@ fun IssueTrackerScreenContent(
         matchesFilter && matchesSearch
     }.sortedByDescending { it.timestamp }
 
-    FaintBackground(colorSchemeType = colorSchemeType) {
-        Scaffold(
+    Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = Color.Transparent,
             floatingActionButton = {
@@ -292,7 +290,6 @@ fun IssueTrackerScreenContent(
                     }
                 }
             }
-        }
     }
 
     if (showAddDialog) {
@@ -401,7 +398,7 @@ fun IssueCard(
                         CategoryBadge(category = issue.category)
                     }
                     
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     
                     Row(
                         horizontalArrangement = Arrangement.Start,
@@ -435,13 +432,14 @@ fun IssueCard(
                     }
 
                     if (issue.description.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(0.dp))
                         Text(
                             text = parseStyledDescription(issue.description),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (issue.isClosed) 0.5f else 0.8f),
                             maxLines = if (expanded) Int.MAX_VALUE else 4,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
 
@@ -489,7 +487,8 @@ fun IssueCard(
                 Text(
                     text = issue.appVersion ?: stringResource(com.gratus.mytodo.R.string.app_version),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.align(Alignment.End),
+                    modifier = Modifier.align(Alignment.End).padding(horizontal = 6.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(12.dp))
@@ -742,7 +741,7 @@ fun IssueAddDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.92f),
+                .fillMaxWidth(0.98f),
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.dialogContainerColor,
             tonalElevation = 0.dp

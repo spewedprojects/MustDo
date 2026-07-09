@@ -28,28 +28,37 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.gratus.mytodo.ui.theme.shiftHueSat
 
 /**
  * FaintBackground draws theme-dependent screen background.
  * For "minimal" theme, it draws extremely soft, beautiful pink and blue blur spheres (blur-3xl equivalent) in light/dark variants.
- * For "colorful" theme, it draws a beautiful, super faint gradient brush to provide premium depth.
+ * For "colorful" theme, it draws a beautiful, super faint gradient brush to provide premium depth,
+ *   with optional hue/saturation shift applied to the gradient stop colors.
  * For "simple" or "system", it renders solid, battery-saving Material background colors.
+ *
+ * @param colorSchemeType Active color scheme key.
+ * @param isDark Whether the current theme is in dark mode. Passed explicitly to avoid
+ *   fragile heuristics based on Color channel values which break under hue shifts.
+ * @param colorfulHueShift Hue rotation applied to the colorful gradient stops (degrees).
+ * @param colorfulSatScale Saturation multiplier applied to the colorful gradient stops.
  */
 @Composable
 fun FaintBackground(
     colorSchemeType: String,
+    isDark: Boolean,
+    colorfulHueShift: Float = 0f,
+    colorfulSatScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
     val modifier = when (colorSchemeType) {
         "minimal" -> {
-            val isDark = MaterialTheme.colorScheme.background.red < 0.2f
             Modifier
                 .fillMaxSize()
                 .background(if (isDark) Color(0xFF0F0E13) else Color(0xFFF7F2FA))
         }
         "colorful" -> {
-            val isDark = MaterialTheme.colorScheme.background.red < 0.2f // Check if base background is dark
-            val colors = if (isDark) {
+            val baseColors = if (isDark) {
                 listOf(
                     Color(0xFF140D1E), // Deep indigo/dark sky
                     Color(0xFF1E112A), // Dark purple Orchid
@@ -62,9 +71,10 @@ fun FaintBackground(
                     Color(0xFFEDFAF6)  // Faint pastel mint-teal
                 )
             }
+            val shiftedColors = baseColors.map { it.shiftHueSat(colorfulHueShift, colorfulSatScale) }
             Modifier
                 .fillMaxSize()
-                .background(Brush.linearGradient(colors))
+                .background(Brush.linearGradient(shiftedColors))
         }
         else -> {
             Modifier
@@ -75,7 +85,6 @@ fun FaintBackground(
 
     Box(modifier = modifier) {
         if (colorSchemeType == "minimal") {
-            val isDark = MaterialTheme.colorScheme.background.red < 0.2f
             if (!isDark) {
                 // Light mode blurry blobs matching "-top-20 -left-20 w-64 h-64 bg-blue-100/30" and "top-1/2 -right-20 w-80 h-80 bg-pink-100/30"
                 androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {

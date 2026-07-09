@@ -68,15 +68,10 @@ fun parseStyledDescription(text: String): AnnotatedString {
                 ParagraphStyle(
                     // firstLine puts the bullet at the current indentation level
                     // restLine pushes wrapped lines in further to align with text
-                    textIndent = TextIndent(firstLine = baseIndent, restLine = indentSize)
+                    textIndent = TextIndent(firstLine = baseIndent, restLine = indentSize),
+                    lineHeight = 20.sp
                 )
             )
-
-            if (index > 0) {
-                builder.pushStyle(SpanStyle(fontSize = 0.sp))
-                builder.append("\n")
-                builder.pop()
-            }
 
             // Append the bullet and the rest of the text
             builder.append("$bulletChar  ")
@@ -85,11 +80,10 @@ fun parseStyledDescription(text: String): AnnotatedString {
             builder.pop() // Remove ParagraphStyle
         } else {
             if (index > 0) {
-                if (prevIsBullet) {
-                    builder.pushStyle(SpanStyle(fontSize = 0.sp))
-                    builder.append("\n")
-                    builder.pop()
-                } else {
+                // Only append a newline if both the previous and current lines are normal (unstyled).
+                // If transitioning from a bullet to normal, Compose automatically breaks the line 
+                // because it's a boundary between a ParagraphStyle and an unstyled paragraph.
+                if (!prevIsBullet) {
                     builder.append("\n")
                 }
             }

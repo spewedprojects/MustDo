@@ -107,11 +107,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val activeTheme by viewModel.settingsTheme.collectAsState()
             val colorSchemeType by viewModel.settingsColorScheme.collectAsState()
+            val colorfulHueShift by viewModel.colorfulHueShift.collectAsState()
+            val colorfulSatScale by viewModel.colorfulSatScale.collectAsState()
 
             val isDark = when (activeTheme) {
                 "light" -> false
-                "dark" -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
+                "dark"  -> true
+                else    -> androidx.compose.foundation.isSystemInDarkTheme()
             }
 
             LaunchedEffect(isDark) {
@@ -137,9 +139,11 @@ class MainActivity : ComponentActivity() {
 
             SoftTodoTheme(
                 themeMode = activeTheme,
-                colorSchemeType = colorSchemeType
+                colorSchemeType = colorSchemeType,
+                colorfulHueShift = colorfulHueShift,
+                colorfulSatScale = colorfulSatScale
             ) {
-                MainLayout(viewModel, colorSchemeType)
+                MainLayout(viewModel, colorSchemeType, isDark, colorfulHueShift, colorfulSatScale)
             }
         }
     }
@@ -164,7 +168,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainLayout(
     viewModel: MainViewModel,
-    colorSchemeType: String
+    colorSchemeType: String,
+    isDark: Boolean,
+    colorfulHueShift: Float,
+    colorfulSatScale: Float
 ) {
     val activeScreen by viewModel.activeScreen.collectAsState()
     val focusDate by viewModel.currentDate.collectAsState()
@@ -175,6 +182,9 @@ fun MainLayout(
         focusDate = focusDate,
         sortOption = sortOption,
         colorSchemeType = colorSchemeType,
+        isDark = isDark,
+        colorfulHueShift = colorfulHueShift,
+        colorfulSatScale = colorfulSatScale,
         onSetActiveScreen = { viewModel.setActiveScreen(it) },
         onNavigateDate = { viewModel.navigateDate(it) },
         onToggleSorting = {
@@ -184,9 +194,9 @@ fun MainLayout(
         },
         screenContent = { onOpenDrawer ->
             when (activeScreen) {
-                Screen.HOME -> HomeScreen(viewModel, onOpenDrawer, colorSchemeType)
-                Screen.HISTORY -> HistoryScreen(viewModel, colorSchemeType)
-                Screen.STATS -> StatsScreen(viewModel, colorSchemeType)
+                Screen.HOME     -> HomeScreen(viewModel, onOpenDrawer, colorSchemeType)
+                Screen.HISTORY  -> HistoryScreen(viewModel, colorSchemeType)
+                Screen.STATS    -> StatsScreen(viewModel, colorSchemeType)
                 Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
                 Screen.ISSUE_TRACKER -> IssueTrackerScreen(onOpenDrawer, colorSchemeType)
             }
@@ -204,6 +214,9 @@ fun MainLayoutContent(
     focusDate: Calendar,
     sortOption: SortOption,
     colorSchemeType: String,
+    isDark: Boolean = false,
+    colorfulHueShift: Float = 0f,
+    colorfulSatScale: Float = 1f,
     onSetActiveScreen: (Screen) -> Unit,
     onNavigateDate: (Int) -> Unit,
     onToggleSorting: () -> Unit,
@@ -229,7 +242,12 @@ fun MainLayoutContent(
             )
         }
     ) {
-        FaintBackground(colorSchemeType = colorSchemeType) {
+        FaintBackground(
+            colorSchemeType = colorSchemeType,
+            isDark = isDark,
+            colorfulHueShift = colorfulHueShift,
+            colorfulSatScale = colorfulSatScale
+        ) {
             Scaffold(
                 modifier = Modifier
                     .fillMaxSize()
@@ -492,7 +510,7 @@ fun AppDrawerContent(
 
         // Version Info
         Text(
-            text = stringResource(R.string.app_version),
+            text = "v${BuildConfig.VERSION_NAME}" + " (${BuildConfig.VERSION_CODE})",
             fontSize = AppFontSizes.micro,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
