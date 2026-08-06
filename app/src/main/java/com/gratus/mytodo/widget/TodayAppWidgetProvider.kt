@@ -63,6 +63,20 @@ class TodayAppWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_app_icon, openAppPendingIntent)
 
+            // Setup Add Task click intent for widget footer button
+            val addTaskIntent = Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_ADD_TASK
+                putExtra(MainActivity.EXTRA_OPEN_ADD_TASK, true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            val addTaskPendingIntent = PendingIntent.getActivity(
+                context,
+                1,
+                addTaskIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            views.setOnClickPendingIntent(R.id.widget_footer, addTaskPendingIntent)
+
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
     }

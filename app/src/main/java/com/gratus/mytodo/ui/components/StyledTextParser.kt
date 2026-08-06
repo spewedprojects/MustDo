@@ -69,7 +69,7 @@ fun parseStyledDescription(text: String): AnnotatedString {
                     // firstLine puts the bullet at the current indentation level
                     // restLine pushes wrapped lines in further to align with text
                     textIndent = TextIndent(firstLine = baseIndent, restLine = indentSize),
-                    lineHeight = 20.sp
+                    lineHeight = 16.sp
                 )
             )
 

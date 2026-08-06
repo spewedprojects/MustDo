@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -71,7 +72,8 @@ import androidx.compose.ui.platform.LocalLocale
 @Composable
 fun HistoryScreen(
     viewModel: MainViewModel,
-    colorSchemeType: String
+    colorSchemeType: String,
+    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
 ) {
     val tasks by viewModel.historyTasks.collectAsState(initial = emptyList())
     val query by viewModel.searchQuery.collectAsState()
@@ -87,7 +89,8 @@ fun HistoryScreen(
         onQueryChange = { viewModel.setSearchQuery(it) },
         onZoomChange = { viewModel.zoomHistory(it) },
         onZoomLevelSet = { viewModel.setHistoryZoom(it) },
-        onFilterChange = { viewModel.setHistoryFilter(it) }
+        onFilterChange = { viewModel.setHistoryFilter(it) },
+        onNavigateToHomeDate = onNavigateToHomeDate
     )
 }
 
@@ -105,12 +108,14 @@ fun HistoryScreenContent(
     onQueryChange: (String) -> Unit,
     onZoomChange: (Int) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
-    onFilterChange: (FilterOption) -> Unit
+    onFilterChange: (FilterOption) -> Unit,
+    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
     // State to throttling scale gestures
     var lastGestureTime by remember { mutableLongStateOf(0L) }
+    var isDoubleColumnInDayView by rememberSaveable { mutableStateOf(false) }
 
     // Pinch to Zoom math utilizing custom cumulative pinch detector
     val pinchZoomModifier = Modifier.pointerInput(Unit) {
@@ -212,6 +217,18 @@ fun HistoryScreenContent(
                         )
                     }
 
+                    if (zoomLevel == 3) {
+                        IconButton(
+                            onClick = { isDoubleColumnInDayView = !isDoubleColumnInDayView }
+                        ) {
+                            Icon(
+                                imageVector = if (isDoubleColumnInDayView) Icons.Default.ViewAgenda else Icons.Default.GridView,
+                                contentDescription = if (isDoubleColumnInDayView) "Switch to Single Column" else "Switch to Double Column",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
 
                     // Filter dropdown
                     Row(
@@ -295,15 +312,20 @@ fun HistoryScreenContent(
                         tasks = tasks,
                         colorSchemeType = colorSchemeType,
                         onQueryChange = onQueryChange,
-                        onZoomLevelSet = onZoomLevelSet
+                        onZoomLevelSet = onZoomLevelSet,
+                        onNavigateToHomeDate = onNavigateToHomeDate
                     )
                     3 -> ExpandedView(
                         tasks = tasks,
-                        colorSchemeType = colorSchemeType
+                        colorSchemeType = colorSchemeType,
+                        onNavigateToHomeDate = onNavigateToHomeDate,
+                        isDoubleColumn = isDoubleColumnInDayView
                     )
                     else -> ExpandedView(
                         tasks = tasks,
-                        colorSchemeType = colorSchemeType
+                        colorSchemeType = colorSchemeType,
+                        onNavigateToHomeDate = onNavigateToHomeDate,
+                        isDoubleColumn = isDoubleColumnInDayView
                     )
                 }
         }
@@ -651,7 +673,8 @@ fun WeekView(
     tasks: List<Task>,
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
-    onZoomLevelSet: (Int) -> Unit
+    onZoomLevelSet: (Int) -> Unit,
+    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
 ) {
     val groupedByWeek = remember(tasks) {
         tasks.groupBy { task ->
@@ -769,15 +792,25 @@ fun WeekView(
                                                         color = MaterialTheme.colorScheme.secondary
                                                     )
                                                     dayTasks.take(3).forEach { task ->
+                                                        val isDark = MaterialTheme.colorScheme.background.red < 0.2f
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                            modifier = Modifier.then(
+                                                                if (onNavigateToHomeDate != null) {
+                                                                    Modifier.clickable {
+                                                                        val dateObj = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                                                                        val cal = Calendar.getInstance().apply { time = dateObj }
+                                                                        onNavigateToHomeDate(cal)
+                                                                    }
+                                                                } else Modifier
+                                                            )
                                                         ) {
                                                             if (task.category != null) {
                                                                 Icon(
                                                                     imageVector = getCategoryIcon(task.category),
                                                                     contentDescription = task.category,
-                                                                    tint = getCategoryAccentColor(task.category),
+                                                                    tint = getCategoryAccentColor(task.category, colorSchemeType, isDark),
                                                                     modifier = Modifier.size(10.dp)
                                                                 )
                                                             }
@@ -820,7 +853,9 @@ fun WeekView(
 @Composable
 fun ExpandedView(
     tasks: List<Task>,
-    colorSchemeType: String
+    colorSchemeType: String,
+    onNavigateToHomeDate: ((Calendar) -> Unit)? = null,
+    isDoubleColumn: Boolean = false
 ) {
     val grouped = remember(tasks) { tasks.groupBy { it.dateAdded } }
     
@@ -861,8 +896,52 @@ fun ExpandedView(
                         
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
                         
-                        groupTasks.forEach { task ->
-                            ExpandedTaskRow(task = task, colorSchemeType = colorSchemeType)
+                        if (isDoubleColumn) {
+                            val col1Tasks = groupTasks.filterIndexed { index, _ -> index % 2 == 0 }
+                            val col2Tasks = groupTasks.filterIndexed { index, _ -> index % 2 == 1 }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    col1Tasks.forEach { task ->
+                                        ExpandedTaskRow(
+                                            task = task,
+                                            colorSchemeType = colorSchemeType,
+                                            onNavigateToHomeDate = onNavigateToHomeDate,
+                                            showDescription = false
+                                        )
+                                    }
+                                }
+                                if (col2Tasks.isNotEmpty()) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        col2Tasks.forEach { task ->
+                                            ExpandedTaskRow(
+                                                task = task,
+                                                colorSchemeType = colorSchemeType,
+                                                onNavigateToHomeDate = onNavigateToHomeDate,
+                                                showDescription = false
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            groupTasks.forEach { task ->
+                                ExpandedTaskRow(
+                                    task = task,
+                                    colorSchemeType = colorSchemeType,
+                                    onNavigateToHomeDate = onNavigateToHomeDate,
+                                    showDescription = true
+                                )
+                            }
                         }
                     }
                 }
@@ -872,14 +951,28 @@ fun ExpandedView(
 }
 
 @Composable
-fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
+fun ExpandedTaskRow(
+    task: Task,
+    colorSchemeType: String,
+    onNavigateToHomeDate: ((Calendar) -> Unit)? = null,
+    showDescription: Boolean = true
+) {
     val isCompleted = task.isCompleted
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
     val context = LocalContext.current
     
     Card(
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .then(
+                if (onNavigateToHomeDate != null) {
+                    Modifier.clickable {
+                        val dateObj = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                        val cal = Calendar.getInstance().apply { time = dateObj }
+                        onNavigateToHomeDate(cal)
+                    }
+                } else Modifier
+            ),
         colors = CardDefaults.cardColors(
             containerColor = if (isCompleted) {
                 if (colorSchemeType == "minimal") {
@@ -947,14 +1040,14 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                             Icon(
                                 imageVector = getCategoryIcon(task.category),
                                 contentDescription = task.category,
-                                tint = getCategoryAccentColor(task.category),
+                                tint = getCategoryAccentColor(task.category, colorSchemeType, isDark),
                                 modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = task.category.uppercase(),
                                 fontSize = AppFontSizes.nano,
                                 fontWeight = FontWeight.Bold,
-                                color = getCategoryAccentColor(task.category)
+                                color = getCategoryAccentColor(task.category, colorSchemeType, isDark)
                             )
                         }
                     }
@@ -997,7 +1090,7 @@ fun ExpandedTaskRow(task: Task, colorSchemeType: String) {
                 }
             }
             
-            if (task.description.isNotBlank()) {
+            if (showDescription && task.description.isNotBlank()) {
                 Text(
                     text = parseStyledDescription(task.description),
                     fontSize = AppFontSizes.medium,

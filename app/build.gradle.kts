@@ -14,8 +14,8 @@ android {
         applicationId = "com.gratus.mytodo"
         minSdk = 27
         targetSdk = 36
-        versionCode = 22
-        versionName = "6.7.0"
+        versionCode = 23
+        versionName = "6.7.1"
 
         // Pass versionName to the app as a resource
         resValue(
@@ -125,10 +125,7 @@ dependencies {
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)

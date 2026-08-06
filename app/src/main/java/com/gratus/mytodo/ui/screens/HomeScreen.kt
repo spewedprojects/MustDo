@@ -655,7 +655,7 @@ fun CategoryCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
-    val accentColor = getCategoryAccentColor(category)
+    val accentColor = getCategoryAccentColor(category, colorSchemeType, isDark)
     val icon = getCategoryIcon(category)
 
     Card(

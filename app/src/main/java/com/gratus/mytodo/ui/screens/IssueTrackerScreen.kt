@@ -63,6 +63,7 @@ import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import kotlinx.coroutines.delay
@@ -841,7 +842,11 @@ fun IssueAddDialog(
                             val selectedText = text.substring(selection.start, selection.end)
                             val formatted = "__${selectedText}__"
                             val newText = text.replaceRange(selection.start, selection.end, formatted)
-                            description = TextFieldValue(newText, androidx.compose.ui.text.TextRange(selection.start + formatted.length))
+                            // Fix: Offset by 2 (for "**") and maintain selection length
+                            description = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(selection.start + 2, selection.start + 2 + selectedText.length)
+                            )
                         } else {
                             Toast.makeText(context, "Select text to format italic", Toast.LENGTH_SHORT).show()
                         }

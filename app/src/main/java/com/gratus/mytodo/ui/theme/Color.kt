@@ -162,3 +162,23 @@ fun getMinimalPriorityColors(priority: Int, isCompleted: Boolean, isDark: Boolea
         }
     }
 }
+
+/**
+ * Resolves color coding accents matching default and custom category titles.
+ * Returns monochromatic palette colors when colorSchemeType is "simple".
+ */
+fun getCategoryAccentColor(category: String, colorSchemeType: String = "", isDark: Boolean = false): Color {
+    if (colorSchemeType == "simple") {
+        return if (isDark) SimpleDarkAccent else SimpleLightAccent
+    }
+    val lower = category.lowercase().trim()
+    return when {
+        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
+        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
+        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
+        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Color(0xFF9C27B0) // Purple
+        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Color(0xFFFF5722) // Orange
+        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Color(0xFFFFC107) // Amber/Yellow
+        else -> Color(0xFF673AB7) // Indigo/default
+    }
+}

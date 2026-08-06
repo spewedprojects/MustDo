@@ -101,6 +101,8 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Database restored successfully!", Toast.LENGTH_LONG).show()
         }
 
+        handleIntent(intent)
+
         // Prompt notification permission at boot on Android 13+
         checkNotificationPermissions()
 
@@ -160,6 +162,25 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.checkPermissions(this)
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra(EXTRA_OPEN_ADD_TASK, false) || intent.action == ACTION_ADD_TASK) {
+            viewModel.setActiveScreen(Screen.HOME)
+            viewModel.setShowAddDialog(true)
+        }
+    }
+
+    companion object {
+        const val ACTION_ADD_TASK = "com.gratus.mytodo.action.ADD_TASK"
+        const val EXTRA_OPEN_ADD_TASK = "open_add_task"
+    }
 }
 
 /**
@@ -195,7 +216,14 @@ fun MainLayout(
         screenContent = { onOpenDrawer ->
             when (activeScreen) {
                 Screen.HOME     -> HomeScreen(viewModel, onOpenDrawer, colorSchemeType)
-                Screen.HISTORY  -> HistoryScreen(viewModel, colorSchemeType)
+                Screen.HISTORY  -> HistoryScreen(
+                    viewModel = viewModel,
+                    colorSchemeType = colorSchemeType,
+                    onNavigateToHomeDate = { targetCal ->
+                        viewModel.setDate(targetCal)
+                        viewModel.setActiveScreen(Screen.HOME)
+                    }
+                )
                 Screen.STATS    -> StatsScreen(viewModel, colorSchemeType)
                 Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
                 Screen.ISSUE_TRACKER -> IssueTrackerScreen(onOpenDrawer, colorSchemeType)

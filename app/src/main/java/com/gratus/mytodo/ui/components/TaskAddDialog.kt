@@ -257,7 +257,8 @@ fun TaskAddDialog(
                                     // Fix: Offset by 2 (for "**") and maintain selection length
                                     descriptionValue = TextFieldValue(
                                         text = newText,
-                                        selection = TextRange(selection.start + 2, selection.start + 2 + selectedText.length))
+                                        selection = TextRange(selection.start + 2, selection.start + 2 + selectedText.length)
+                                    )
                                 } else {
                                     Toast.makeText(context, "Select description text to format bold", Toast.LENGTH_SHORT).show()
                                 }
@@ -513,6 +514,7 @@ fun TaskAddDialog(
                             shape = RoundedCornerShape(10.dp),
                             containerColor = MaterialTheme.colorScheme.dialogContainerColor,
                             shadowElevation = 8.dp,
+                            modifier = Modifier.heightIn(max = 350.dp)
                         ) {
                             DropdownMenuItem(
                                 text = { Text("None") },
