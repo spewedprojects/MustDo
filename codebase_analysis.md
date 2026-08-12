@@ -6,22 +6,23 @@ This document provides a thorough breakdown of the **MustDo** Android applicatio
 
 ## 1. Directory Structure & File Mapping
 
-The codebase follows an MVVM architecture utilizing Jetpack Compose for the UI layer, and Room Database for data persistence.
+The codebase follows an MVVM architecture utilizing Jetpack Compose for the UI layer, and Room Database for data persistence. UI components are modularized into domain-focused subpackages under `ui/components/`.
 
 ```
 app/src/main/
 ├── AndroidManifest.xml                        # Main configuration, permissions, components registration
 ├── java/com/gratus/mytodo/
-│   ├── AlarmActivity.kt                       # Full-screen activity for ringing alarms and custom ringtones
-│   ├── MainActivity.kt                        # Host Activity, Navigation Drawer, dynamic Edge-to-Edge system bar icons
-│   ├── SnoozeActivity.kt                      # Handles snooze duration selection for active alarms
+│   ├── AlarmActivity.kt                       # Full-screen activity hosting AlarmScreenContent for ringing alarms
+│   ├── MainActivity.kt                        # Host Activity, navigation drawer host, dynamic Edge-to-Edge system bars
+│   ├── SnoozeActivity.kt                      # Translucent Activity hosting SnoozeDialogContent for active alarms
 │   ├── components/
 │   │   ├── AlarmService.kt                   # Foreground service managing media playback for alarms
 │   │   ├── BootReceiver.kt                   # BroadcastReceiver to reschedule active alarms after device reboot
-│   │   └── NotificationReceiver.kt           # BroadcastReceiver using goAsync() to post exact alarms notifications
+│   │   └── NotificationReceiver.kt           # BroadcastReceiver using goAsync() to post exact alarm notifications
 │   ├── data/
-│   │   ├── Converters.kt                     # Room TypeConverters for lists (subtasks) and custom objects
-│   │   ├── Task.kt                           # Room Entity: Task data schema
+│   │   ├── Converters.kt                     # Room TypeConverters for lists (subtasks, comments) and custom objects
+│   │   ├── IssueItem.kt                      # Room Entity & model: Issue tracker item schema
+│   │   ├── Task.kt                           # Room Entity & model: Task data schema
 │   │   ├── TaskDao.kt                        # Data Access Object: Queries and DB updates
 │   │   ├── TaskDatabase.kt                   # Room Database initializer
 │   │   ├── TaskRepository.kt                 # Repository layer abstracting DAO operations
@@ -31,13 +32,42 @@ app/src/main/
 │   │   ├── MainViewModel.kt                  # State-holder: Business logic, stats calculation, alarm registration
 │   │   ├── components/
 │   │   │   ├── FaintBackground.kt            # Draws custom canvas graphics/gradients based on theme
+│   │   │   ├── InlineCalendarView.kt         # Collapsible inline calendar strip component with task indicators
 │   │   │   ├── StyledTextParser.kt           # Compiles markdown bold/italic/bullets into AnnotatedStrings
-│   │   │   └── TaskAddDialog.kt              # Scrollable dialog with Segmented Edit/Repeat buttons
+│   │   │   ├── TaskAddDialog.kt              # Scrollable dialog with Segmented Edit/Repeat buttons
+│   │   │   ├── alarm/
+│   │   │   │   ├── AlarmScreenContent.kt     # Full-screen critical task alarm overlay layout and previews
+│   │   │   │   └── SnoozeDialogContent.kt    # Dialog composable for preset & custom snooze selection
+│   │   │   ├── dialogs/
+│   │   │   │   └── CategoryChip.kt           # Visual category chip selector and getCategoryIcon helper
+│   │   │   ├── history/
+│   │   │   │   ├── ExpandedView.kt           # Level 3 expanded detail view and task rows
+│   │   │   │   ├── MainFontText.kt           # Custom styled text wrapper for history timelines
+│   │   │   │   ├── MonthView.kt              # Level 1 month grid layout
+│   │   │   │   ├── WeekView.kt               # Level 2 week list layout
+│   │   │   │   ├── YearView.kt               # Level 0 year grid layout
+│   │   │   │   └── ZoomableTaskRow.kt        # Multi-level zoomable row dispatcher component
+│   │   │   ├── home/
+│   │   │   │   ├── CategoryCard.kt           # Category container card and getCategoryAccentColor helper
+│   │   │   │   ├── TaskItemCard.kt           # Task item card composable with priority badges & previews
+│   │   │   │   └── TaskItemHelpers.kt        # borderStrokeSimple and getPriorityBoxColor helpers
+│   │   │   ├── issue/
+│   │   │   │   ├── CategoryBadge.kt          # Issue category badge chip and getCategoryColor helper
+│   │   │   │   ├── IssueAddDialog.kt         # Dialog for adding/editing issue tracker items
+│   │   │   │   └── IssueCard.kt              # Expandable issue card with comment threads & previews
+│   │   │   ├── navigation/
+│   │   │   │   ├── AppDrawerContent.kt       # Navigation drawer sheet layout and GitHub link
+│   │   │   │   └── MainLayoutContent.kt      # Main scaffold layout with TopAppBar and drawer container
+│   │   │   └── stats/
+│   │   │       ├── CompletionRateCard.kt     # Circular canvas progress card for completion rate
+│   │   │       ├── ConsistencyCard.kt        # Streak count card with flame graphics
+│   │   │       └── WeeklyChartCard.kt        # Custom Canvas bar chart card for 7-day task outline
 │   │   ├── screens/
-│   │   │   ├── HomeScreen.kt                 # Daily task list view, datepicker, and HorizontalPager
+│   │   │   ├── HomeScreen.kt                 # Daily task list view, datepicker, category filters, and FABs
 │   │   │   ├── HistoryScreen.kt              # Calendar groups, zoom FABs, and cumulative zoom gestures
+│   │   │   ├── IssueTrackerScreen.kt         # Issue tracker dashboard, search filter, and list container
 │   │   │   ├── SettingsScreen.kt             # Preferences, scheme selectors, repeat intervals, and backups
-│   │   │   └── StatsScreen.kt                # Scrollable circular completion progress, streaks, and weekly chart
+│   │   │   └── StatsScreen.kt                # Stats dashboard assembling completion, streak, and chart cards
 │   │   ├── theme/
 │   │   │   ├── Color.kt                      # Defines core colors, priority levels, and scheme utilities
 │   │   │   ├── Theme.kt                      # Integrates Light/Dark palettes into SoftTodoTheme
@@ -79,11 +109,13 @@ app/src/main/
 
 ## 2. System Relationships & State Propagation
 
-The app leverages a shared view model architecture to ensure state syncs instantly across all screens:
+The app leverages a shared ViewModel architecture to ensure state syncs instantly across all screens. View layer components are cleanly separated into stateless composables and top-level screen containers:
 
 ```mermaid
 graph TD
-    MA[MainActivity] --> VM[MainViewModel]
+    MA[MainActivity] --> MLC[MainLayoutContent]
+    MLC --> ADC[AppDrawerContent]
+    MLC --> VM[MainViewModel]
     MA --> Theme[SoftTodoTheme]
     VM --> Rep[TaskRepository]
     Rep --> DAO[TaskDao]
@@ -92,33 +124,44 @@ graph TD
     VM -- "Flow<List<Task>>" --> Home[HomeScreen]
     VM -- "Flow<List<Task>>" --> Hist[HistoryScreen]
     VM -- "Flow<StatsData>" --> Stats[StatsScreen]
+    VM -- "Flow<List<IssueItem>>" --> Issue[IssueTrackerScreen]
     VM -- "theme/scheme Flow" --> Sett[SettingsScreen]
+
+    Home --> TaskCard[TaskItemCard]
+    Home --> CatCard[CategoryCard]
+    Home --> InlineCal[InlineCalendarView]
+    Hist --> ZoomRow[ZoomableTaskRow]
+    Stats --> RateCard[CompletionRateCard]
+    Stats --> StreakCard[ConsistencyCard]
+    Stats --> ChartCard[WeeklyChartCard]
+    Issue --> IssueCardComp[IssueCard]
 
     Sett -- "Triggers preference update" --> VM
     VM -- "Re-evaluates theme mode" --> MA
 ```
 
 ### Key Interactions:
-1. **Shared ViewModel Scope:** The `MainActivity` instantiates `MainViewModel` via `by viewModels()`. This single instance is passed to all sub-screens (`HomeScreen`, `HistoryScreen`, `StatsScreen`, `SettingsScreen`), ensuring they all operate on the exact same states.
-2. **Settings Propagation:** 
+1. **Shared ViewModel Scope:** `MainActivity` instantiates `MainViewModel` via `by viewModels()`. This single instance is passed down to all sub-screens (`HomeScreen`, `HistoryScreen`, `StatsScreen`, `SettingsScreen`, `IssueTrackerScreen`), ensuring consistent state across the app.
+2. **Stateless UI Component Extraction:** Heavy UI components (e.g. `MainLayoutContent`, `AppDrawerContent`, `TaskItemCard`, `CategoryCard`, `ZoomableTaskRow`, `IssueCard`, `WeeklyChartCard`, `AlarmScreen`, `SnoozeDialog`) are extracted into decoupled, standalone composables. They receive explicit state parameters and pass user actions upward via lambda callbacks, enabling localized `@Preview` previews in light/dark/theme variants.
+3. **Settings Propagation:** 
    - `SettingsScreen` invokes `viewModel.setTheme(mode)` and `viewModel.setColorScheme(scheme)`.
    - `MainViewModel` persists these settings in `SharedPreferences` (`soft_todo_prefs`) and publishes updates to `settingsTheme` and `settingsColorScheme` state flows.
-   - `MainActivity` collects these flows as compose state. This triggers a recomposition of `SoftTodoTheme` and `FaintBackground`, changing the entire app's look instantly.
-3. **Database-UI Reactive Loop:** All queries inside `TaskDao` return `Flow<List<Task>>`. Any operation (e.g. marking a task complete on the `HomeScreen`) writes to Room, which automatically forces the corresponding database flow to emit the new data. Screens instantly recompose with the updated task lists without manual refreshing.
-4. **Alarms Synchronization:** When tasks are added, completed, updated, or deleted, `MainViewModel` schedules or cancels exact alarms using `AlarmManager`.
-5. **Widget Reactive Syncing:** When task state changes, `MainViewModel` broadcasts a `com.gratus.mytodo.action.WIDGET_UPDATE` intent, causing `TodayAppWidgetProvider` to request list view updates. Tapping the checkbox in the widget fires a `com.gratus.mytodo.action.TOGGLE_COMPLETE` broadcast which toggles the task completion in the database on a background coroutine, triggers database alarm rescheduling via `NotificationReceiver`, and alerts the widget to redraw.
+   - `MainActivity` collects these flows as Compose state, triggering a recomposition of `SoftTodoTheme` and `FaintBackground` that instantly updates the app's visual theme.
+4. **Database-UI Reactive Loop:** All queries inside `TaskDao` return `Flow<List<Task>>` or `Flow<List<IssueItem>>`. Any mutation (e.g. marking a task complete on `HomeScreen`) writes to Room, which automatically forces the corresponding Flow to emit updated data.
+5. **Alarms Synchronization:** When tasks are added, completed, updated, or deleted, `MainViewModel` schedules or cancels exact alarms using `AlarmManager`.
+6. **Widget Reactive Syncing & Quick Actions:** When task state changes, `MainViewModel` broadcasts a `com.gratus.mytodo.action.WIDGET_UPDATE` intent, causing `TodayAppWidgetProvider` to request list view updates. Tapping the checkbox in the widget fires `TOGGLE_COMPLETE` to update DB task completion, while tapping the Add Task shortcut button in the widget opens `MainActivity` directly with task creation intents.
 
 ---
 
 ## 3. Backup and Restore Mechanism
 
-Currently, backups are handled via raw JSON serialization and deserialization:
+Backups are managed via JSON serialization/deserialization and raw SQLite DB file import/export:
 
 ### Export Workflow
 1. User clicks **Export to Device** in `SettingsScreen`.
 2. The UI invokes `viewModel.exportBackup()`.
 3. `exportBackup` queries `TaskDatabase` for all tasks via `getAllTasksDirect()` on `Dispatchers.IO`.
-4. It iterates over the task list, converting each field into a `JSONObject` and adding them to a `JSONArray`.
+4. It iterates over the task list, converting each field into a `JSONObject` and appending them to a `JSONArray`.
 5. The output is written to `todo_backup.json` inside the device's public `Downloads` directory via Android's `MediaStore`. Concurrently, a raw DB backup copy is saved to `todo_backup.db`.
 
 ### Import & Restore Workflow
@@ -135,7 +178,7 @@ Currently, backups are handled via raw JSON serialization and deserialization:
 The app uses a centralized typography structure to maintain visual consistency across all screens:
 
 - **Type.kt** maps material typography tokens to unified styles where every font size is increased by **+2sp** compared to standard system size rules.
-- **AppFontSizes** contains helper size scales (ranging from `pico = 10.sp` to `headline = 26.sp`) that are used across all screens instead of hardcoded sizes.
+- **AppFontSizes** contains helper size scales (ranging from `micro = 10.sp` to `headline = 26.sp`) that are used across all screens instead of hardcoded sizes.
 - **Dynamic Zoom Sizes:** History screen text size scales dynamically based on the active pinch-to-zoom level through `AppFontSizes.titleForZoom(level)` and `AppFontSizes.bodyForZoom(level)`.
 
 ---
@@ -146,26 +189,30 @@ Colors are managed inside `Theme.kt` and `Color.kt` through standard Compose par
 
 - **`SoftTodoTheme` Selection:** Translates setting codes to M3 ColorSchemes:
   - `"minimal"`: Indigo and lavender accents.
-  - `"simple"`: strictly monochromatic (black/white).
+  - `"simple"`: Strictly monochromatic (black/white).
   - `"colorful"`: Orchid purple + rose pastel with radial sweep animations.
   - `"system"`: Monet dynamic coloring (Android 12+).
-- **Badge Colors:** Priority badges dynamically style their box container and borders based on the selected scheme (e.g. using `getMinimalPriorityColors()` or `getPriorityBoxColor()`).
-- **Drawer Styling:** The navigation drawer uses a solid, non-transparent sheet background for `"minimal"` and `"colorful"` themes to prevent visual overlap issues.
-- **Delete Dialog Styling:** The deletion confirmation alert dialog is styled with outlines matching the active theme's borders (black/white in Simple, slate/indigo in Minimal) to prevent it from blending into the background of monochromatic screens.
+- **Badge & Accent Colors:** Priority badges and category cards dynamically style container colors and borders based on the selected scheme (e.g. `getMinimalPriorityColors()`, `getPriorityBoxColor()`, `getCategoryAccentColor()`, `getCategoryColor()`).
+- **Monochromatic Simple Theme Tinting:** In `"simple"` B&W scheme mode, category icons, category badges, chips, and headers render using monochromatic black/white tinting rather than vibrant colors.
+- **Drawer Styling:** `AppDrawerContent` uses a solid, non-transparent sheet background for `"minimal"` and `"colorful"` themes to prevent visual overlap issues.
+- **Delete Dialog Styling:** Deletion confirmation alert dialogs are styled with outlines matching the active theme's borders (black/white in Simple, slate/indigo in Minimal) to prevent them from blending into monochromatic backgrounds.
 
 ---
 
 ## 6. Recommended Helper Classes & Refinements
 
-1. **`DateTimeUtils`:** Thread-safe utility helper that centralizes all Date/Time formatting and parsing operations. It queries `DateFormat.is24HourFormat(context)` to dynamically display reminder timestamps in either 12-hour or 24-hour format matching the system preferences.
-2. **`PinchGestureHelper`:** Implements `detectPinchZoom` which accumulates relative zoom events over a single gesture cycle and triggers zoom-in or zoom-out callbacks only when threshold boundaries (e.g., > 1.25x or < 0.75x) are crossed, resolving slow gesture dead-zones. Checks pointer counts so single-finger navigation or drawer gestures are ignored by the zoom handler.
-3. **`NotificationReceiver`**: Extends `BroadcastReceiver` and uses `goAsync()` to run database lookups on a background coroutine while keeping the receiver process alive. Now includes interactive notification buttons: `"Mark Complete"` and `"Stop"`, handling these actions inside `onReceive()`. Uses `R.drawable.icon_v3_notif` for the notification's small icon.
-4. **`SCHEDULE_EXACT_ALARM`**: The app declares `SCHEDULE_EXACT_ALARM` in its manifest (having removed `USE_EXACT_ALARM` to ensure proper visibility in system settings and avoid Play Store rejections). Toggling this setting in system settings changes the app's permission state dynamically, which is checked via `AlarmManager.canScheduleExactAlarms()` alongside `POST_NOTIFICATIONS` runtime checks.
-5. **`TodayAppWidgetProvider` & `TodayWidgetService`**: Implements a home screen widget showing today's tasks using `RemoteViews` and a `RemoteViewsService`. Supports task completions toggled directly from the home screen. Refactored to use `goAsync()` in broadcast handlers to prevent background database write process crashes, and dynamic connection retrieval inside `onDataSetChanged()` to handle database closes. Kept in ProGuard configuration (`proguard-rules.pro`) to prevent widget RemoteViews binder transaction failures in release mode.
-6. **Room Database Migration v3**: SQLite migrations defined by `MIGRATION_1_2` and `MIGRATION_2_3` safely upgrade existing user tables to include `repeatCount` (default 1), `repeatedTimes` (default 0), `isReminderActive` (default 1), and `nextReminderTime` (nullable Long), supporting repeating alarm triggers and suspended reminders without database resets or data loss.
-7. **Boot Rescheduling**: `BootReceiver` listens for `ACTION_BOOT_COMPLETED` and automatically calls `NotificationReceiver.rescheduleAllAlarms(context)` so users do not lose pending reminders after a device restart.
-8. **Alarm & Snooze Activities**: `AlarmService` provides a foreground service playing custom media ringtones while `AlarmActivity` displays a full-screen notification overlay. `SnoozeActivity` offers a UI for deferring reminders dynamically (e.g., 10 mins, 1 hour).
-9. **Subtasks & Categorization**: `Task` entities now support nested `subTasks` (converted to JSON strings in Room via `Converters.kt`) and `category` tags. The UI dynamically tracks subtask completion and automatically completes the main parent task when all subtasks are finished.
+1. **Modular Subpackage Architecture:** UI composables are cleanly separated into domain subpackages (`home`, `history`, `issue`, `stats`, `dialogs`, `navigation`, `alarm`). Screen container files (`HomeScreen.kt`, `HistoryScreen.kt`, `IssueTrackerScreen.kt`, `StatsScreen.kt`, `MainActivity.kt`, `AlarmActivity.kt`, `SnoozeActivity.kt`) contain layout orchestration while delegating modular rendering to component files.
+2. **`DateTimeUtils`:** Thread-safe utility helper that centralizes all Date/Time formatting and parsing operations. It queries `DateFormat.is24HourFormat(context)` to dynamically display reminder timestamps in either 12-hour or 24-hour format matching system preferences.
+3. **`InlineCalendarView`:** Interactive horizontal date strip component displayed on `HomeScreen` with task status indicator dots (marking days with active or completed tasks) and a Jump-to-Today action button.
+4. **History Task Tap Navigation:** Tapping any task row in `HistoryScreen` (across Year, Month, Week, or Expanded views) updates `focusDate` in `MainViewModel` to the task's date and navigates immediately to `HomeScreen`.
+5. **`PinchGestureHelper`:** Implements `detectPinchZoom` which accumulates relative zoom events over a single gesture cycle and triggers zoom-in or zoom-out callbacks only when threshold boundaries (e.g., > 1.25x or < 0.75x) are crossed, resolving slow gesture dead-zones. Checks pointer counts so single-finger navigation or drawer gestures are ignored by the zoom handler.
+6. **`NotificationReceiver`**: Extends `BroadcastReceiver` and uses `goAsync()` to run database lookups on a background coroutine while keeping the receiver process alive. Includes interactive notification buttons: `"Mark Complete"` and `"Stop"`, handling these actions inside `onReceive()`. Uses `R.drawable.icon_v3_notif` for notification small icons.
+7. **`SCHEDULE_EXACT_ALARM`**: Declared in the manifest (having removed `USE_EXACT_ALARM` to ensure proper visibility in system settings and avoid Play Store rejections). System permission state is checked via `AlarmManager.canScheduleExactAlarms()` alongside `POST_NOTIFICATIONS` runtime checks.
+8. **`TodayAppWidgetProvider` & `TodayWidgetService`**: Implements a home screen widget showing today's tasks using `RemoteViews` and a `RemoteViewsService`. Supports task completions toggled directly from the home screen and includes an Add Task shortcut button in the widget footer bar. Refactored to use `goAsync()` in broadcast handlers to prevent background database write crashes. Kept in ProGuard configuration (`proguard-rules.pro`).
+9. **Room Database Migrations**: SQLite migrations (`MIGRATION_1_2`, `MIGRATION_2_3`, etc.) upgrade user tables to include `repeatCount`, `repeatedTimes`, `isReminderActive`, `nextReminderTime`, and `IssueItem` entities, supporting repeating alarm triggers and issue tracking without database resets or data loss.
+10. **Boot Rescheduling**: `BootReceiver` listens for `ACTION_BOOT_COMPLETED` and automatically calls `NotificationReceiver.rescheduleAllAlarms(context)` so users do not lose pending reminders after a device restart.
+11. **Alarm & Snooze Components**: `AlarmService` provides a foreground service playing custom media ringtones while `AlarmScreenContent` (in `AlarmActivity`) displays a full-screen notification overlay. `SnoozeDialogContent` (in `SnoozeActivity`) offers a UI for deferring reminders dynamically (e.g., 5m, 10m, 15m, 30m, custom).
+12. **Subtasks, Categories & Issue Tracker**: `Task` entities support nested `subTasks` (converted to JSON strings in Room via `Converters.kt`) and `category` tags. `IssueItem` entities manage issue tracker items with serial numbers, category badges (`Issue`, `Feature`, `Idea`), descriptions, markdown styling, and nested `comments`.
 
 ---
 
@@ -175,6 +222,11 @@ The application has undergone several key transitions since its initial version:
 
 | Feature / Area                          | June 10th and Initial Versions                                                                                                                                        | Current Refined Version                                                                                                                                                                                                                                                                                                               |
 |:----------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Component Architecture**              | Inline composable functions tightly coupled within large screen files (e.g. `HomeScreen.kt`, `HistoryScreen.kt`, `IssueTrackerScreen.kt`, `MainActivity.kt`).         | Extracted into modular, domain-scoped subpackages under `com.gratus.mytodo.ui.components.*` (`home`, `history`, `issue`, `stats`, `dialogs`, `navigation`, `alarm`), promoting single-responsibility, maintainability, reusability, and standalone Compose `@Preview` support across light/dark/theme variants.                       |
+| **History Task Navigation**             | Tapping past tasks in History screen only expanded/collapsed card details or had no navigation effect.                                                                | Tapping any task row in `HistoryScreen` updates `focusDate` in `MainViewModel` to the task's date and navigates directly to `HomeScreen` for immediate date context and editing.                                                                                                                                                      |
+| **Monochromatic Simple Category Theme** | Category icons and tags maintained full vibrant colors even when Simple B&W theme mode was active.                                                                    | Automatically tints category icons, chips, and badge borders with monochromatic black/white tones when Simple B&W scheme is active (Serial #29).                                                                                                                                                                                      |
+| **Inline Calendar View**                | Date selection relied exclusively on standard top app bar date labels or full date picker dialogs.                                                                    | Integrated `InlineCalendarView.kt` featuring a scrollable horizontal day strip, task indicator dots, and a Jump-to-Today shortcut button (Serial #27).                                                                                                                                                                                |
+| **Widget Add Task Shortcut**            | Widget only supported viewing today's tasks and toggling task completion checkmarks.                                                                                  | Added an "Add Task" shortcut button in the widget footer bar (`TodayAppWidgetProvider`) to launch `MainActivity` directly with task creation intents (Serial #34).                                                                                                                                                                    |
 | **Pinch-to-Zoom**                       | Zoom gestures were broken because they processed instantaneous frame-deltas, failing to register slow gestures.                                                       | Uses a custom `PinchGestureHelper` for smooth transitions across 4 custom zoom levels: Year (12-month grids, click to zoom), Month (week grids, click to zoom), Week (day grids with 1-line titles + summary, click to zoom), and Regular View (detailed task list).                                                                  |
 | **Reminder Dialog Flow**                | Required the user to pick a date first, then pick a time.                                                                                                             | Directly opens the `TimePickerDialog`, automatically applying the chosen time to the task's main target date.                                                                                                                                                                                                                         |
 | **Landscape Usability**                 | Dialogs and Stats screens overflowed and got cut off in landscape mode.                                                                                               | Dialog content is fully scrollable. The Stats Screen utilizes weights for an adaptive layout with no vertical scrollbar (side-by-side top cards in portrait, stacked left cards in landscape; chart on bottom in portrait, chart on right in landscape).                                                                              |
@@ -183,7 +235,7 @@ The application has undergone several key transitions since its initial version:
 | **Time Format Preference**              | Hardcoded to 12-hour format across the app.                                                                                                                           | Dynamically queries system settings using `is24HourFormat(context)` and formats both pickers and visual text labels accordingly.                                                                                                                                                                                                      |
 | **Layout Outlines & Dialogs**           | Alert dialogs had default styling without borders, blending into monochromatic themes.                                                                                | Applied custom borders to `AlertDialog` to match the outline properties of Clean Minimalism and Simple B&W themes.                                                                                                                                                                                                                    |
 | **Stats Completion Metric**             | Calculated rate and done ratios using all tasks, including those scheduled in the future.                                                                             | Stats completion rate and "x of y Done" counts are filtered to only evaluate tasks up to today's date.                                                                                                                                                                                                                                |
-| **History Records List**                | Displayed future tasks alongside completed and past tasks.                                                                                                            | Filters out future tasks from the History records by default, but displays them when the user explicitly searches/filters by a date or month pattern.                                                                                                                                                                                 |
+| **History Records List**                | Displayed future tasks alongside completed and past tasks.                                                                                                            | Filters out future tasks from the History records by default, but displays them when the user explicitly searches/filters by a date or month pattern.                                                                                                                                                            me                   |
 | **Dialog State Rotation**               | Closing the add/edit dialog on rotation caused data loss.                                                                                                             | Moves dialog state and edited task items to `MainViewModel` and implements `rememberSaveable` on dialog input fields to persist state across device rotations.                                                                                                                                                                        |
 | **Alarm Time Info**                     | Hides alert time info from completed tasks or once the alarm time has passed.                                                                                         | Keeps the "Alert scheduled: ..." info text visible on the home task card even after it has triggered or the task has been marked complete.                                                                                                                                                                                            |
 | **Header Date text**                    | Displayed formatted date in TopAppBar for all active dates.                                                                                                           | Displays `"Today"` instead of formatted date in the TopAppBar of `MainActivity` if the active date matches the current system date.                                                                                                                                                                                                   |
