@@ -80,12 +80,15 @@ fun HistoryScreen(
     val zoomLevel by viewModel.historyZoomLevel.collectAsState()
     val activeFilter by viewModel.historyFilter.collectAsState()
 
+    val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
+
     HistoryScreenContent(
         tasks = tasks,
         query = query,
         zoomLevel = zoomLevel,
         activeFilter = activeFilter,
         colorSchemeType = colorSchemeType,
+        isStickyEnabled = isStickyEnabled,
         onQueryChange = { viewModel.setSearchQuery(it) },
         onZoomChange = { viewModel.zoomHistory(it) },
         onZoomLevelSet = { viewModel.setHistoryZoom(it) },
@@ -105,6 +108,7 @@ fun HistoryScreenContent(
     zoomLevel: Int,
     activeFilter: FilterOption,
     colorSchemeType: String,
+    isStickyEnabled: Boolean = true,
     onQueryChange: (String) -> Unit,
     onZoomChange: (Int) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
@@ -270,8 +274,16 @@ fun HistoryScreenContent(
             }
         }
 
+        val stickyTasks = remember(tasks, isStickyEnabled) {
+            if (!isStickyEnabled) emptyList()
+            else tasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+        }
+        val regularTasks = remember(tasks) {
+            tasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
+        }
+
         // Timeline Content List with AnimatedContent to handle cross-fades
-        if (tasks.isEmpty()) {
+        if (regularTasks.isEmpty() && stickyTasks.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -298,31 +310,36 @@ fun HistoryScreenContent(
             ) { targetZoom ->
                 when (targetZoom) {
                     0 -> YearView(
-                        tasks = tasks,
+                        tasks = regularTasks,
+                        stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onQueryChange = onQueryChange,
                         onZoomLevelSet = onZoomLevelSet
                     )
                     1 -> MonthView(
-                        tasks = tasks,
+                        tasks = regularTasks,
+                        stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onZoomLevelSet = onZoomLevelSet
                     )
                     2 -> WeekView(
-                        tasks = tasks,
+                        tasks = regularTasks,
+                        stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onQueryChange = onQueryChange,
                         onZoomLevelSet = onZoomLevelSet,
                         onNavigateToHomeDate = onNavigateToHomeDate
                     )
                     3 -> ExpandedView(
-                        tasks = tasks,
+                        tasks = regularTasks,
+                        stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onNavigateToHomeDate = onNavigateToHomeDate,
                         isDoubleColumn = isDoubleColumnInDayView
                     )
                     else -> ExpandedView(
-                        tasks = tasks,
+                        tasks = regularTasks,
+                        stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onNavigateToHomeDate = onNavigateToHomeDate,
                         isDoubleColumn = isDoubleColumnInDayView
@@ -397,6 +414,7 @@ fun MainFontText(
 @Composable
 fun YearView(
     tasks: List<Task>,
+    stickyTasks: List<Task> = emptyList(),
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
     onZoomLevelSet: (Int) -> Unit
@@ -530,6 +548,7 @@ fun YearView(
 @Composable
 fun MonthView(
     tasks: List<Task>,
+    stickyTasks: List<Task> = emptyList(),
     colorSchemeType: String,
     onZoomLevelSet: (Int) -> Unit
 ) {
@@ -568,13 +587,89 @@ fun MonthView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            text = monthStr,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        val activeStickyInMonth = remember(stickyTasks, monthStr) {
+                            stickyTasks.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = monthStr,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            if (activeStickyInMonth.isNotEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PushPin,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Text(
+                                        text = "${activeStickyInMonth.size} Sticky",
+                                        fontSize = AppFontSizes.extraSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        if (activeStickyInMonth.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                activeStickyInMonth.forEach { stickyTask ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PushPin,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Text(
+                                                text = stickyTask.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        Text(
+                                            text = "Everyday",
+                                            fontSize = AppFontSizes.nano,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         val weeksInMonth = remember(monthTasks) {
                             monthTasks.groupBy { task ->
@@ -671,6 +766,7 @@ fun MonthView(
 @Composable
 fun WeekView(
     tasks: List<Task>,
+    stickyTasks: List<Task> = emptyList(),
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
@@ -720,6 +816,17 @@ fun WeekView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        val activeStickyInWeek = remember(stickyTasks, weekDate) {
+                            val weekEnd = Calendar.getInstance().apply {
+                                time = weekDate
+                                add(Calendar.DAY_OF_MONTH, 6)
+                            }.time
+                            stickyTasks.filter { task ->
+                                val stickyDate = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                                !stickyDate.after(weekEnd)
+                            }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -730,22 +837,105 @@ fun WeekView(
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer)
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "$done/$total Done",
-                                    fontSize = AppFontSizes.extraSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                if (activeStickyInWeek.isNotEmpty()) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PushPin,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Text(
+                                            text = "${activeStickyInWeek.size} Sticky",
+                                            fontSize = AppFontSizes.extraSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "$done/$total Done",
+                                        fontSize = AppFontSizes.extraSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
                             }
                         }
 
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                        if (activeStickyInWeek.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                activeStickyInWeek.forEach { stickyTask ->
+                                    val stickyCal = remember(stickyTask.dateAdded) {
+                                        Calendar.getInstance().apply {
+                                            time = DateTimeUtils.parseDbDate(stickyTask.dateAdded) ?: Date()
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                                            .clickable { onNavigateToHomeDate?.invoke(stickyCal) }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PushPin,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(getPriorityBoxColor(stickyTask.priority, stickyTask.isCompleted))
+                                            )
+                                            Text(
+                                                text = stickyTask.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        Text(
+                                            text = "Everyday",
+                                            fontSize = AppFontSizes.nano,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
 
                         val daysInWeek = remember(weekTasks) {
                             weekTasks.groupBy { it.dateAdded }.toSortedMap()
@@ -853,6 +1043,7 @@ fun WeekView(
 @Composable
 fun ExpandedView(
     tasks: List<Task>,
+    stickyTasks: List<Task> = emptyList(),
     colorSchemeType: String,
     onNavigateToHomeDate: ((Calendar) -> Unit)? = null,
     isDoubleColumn: Boolean = false
@@ -888,13 +1079,61 @@ fun ExpandedView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = DateTimeUtils.formatHistoryGroup(dateObj),
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        val activeStickyForDay = remember(stickyTasks, dateObj) {
+                            stickyTasks.filter { task ->
+                                val stickyDate = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
+                                !stickyDate.after(dateObj)
+                            }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = DateTimeUtils.formatHistoryGroup(dateObj),
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            if (activeStickyForDay.isNotEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PushPin,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Text(
+                                        text = "${activeStickyForDay.size} Sticky",
+                                        fontSize = AppFontSizes.extraSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
                         
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                        
+                        if (activeStickyForDay.isNotEmpty()) {
+                            activeStickyForDay.forEach { stickyTask ->
+                                ExpandedTaskRow(
+                                    task = stickyTask,
+                                    colorSchemeType = colorSchemeType,
+                                    onNavigateToHomeDate = onNavigateToHomeDate,
+                                    showDescription = !isDoubleColumn
+                                )
+                            }
+                        }
                         
                         if (isDoubleColumn) {
                             val col1Tasks = groupTasks.filterIndexed { index, _ -> index % 2 == 0 }

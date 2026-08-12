@@ -129,16 +129,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _isStickyEnabled = MutableStateFlow(sharedPrefs.getBoolean("enable_sticky_tasks", true))
+    val isStickyEnabled: StateFlow<Boolean> = _isStickyEnabled.asStateFlow()
+
+    fun setStickyEnabled(enabled: Boolean) {
+        _isStickyEnabled.value = enabled
+        sharedPrefs.edit().putBoolean("enable_sticky_tasks", enabled).apply()
+        updateWidget()
+    }
+
     // Category / Tag Management
-    private val defaultCategories = listOf("Personal", "Work", "Errands", "Health", "Learning")
+    private val defaultCategories = listOf("Sticky", "Personal", "Work", "Errands", "Health", "Learning")
     private val _customCategories = MutableStateFlow<List<String>>(
         sharedPrefs.getStringSet("custom_categories", emptySet())?.toList()?.sorted() ?: emptyList()
     )
     val customCategories: StateFlow<List<String>> = _customCategories.asStateFlow()
 
-    val categories: StateFlow<List<String>> = _customCategories
-        .map { custom -> (defaultCategories + custom).distinct() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, defaultCategories)
+    val categories: StateFlow<List<String>> = combine(_customCategories, _isStickyEnabled) { custom, stickyEnabled ->
+        val base = if (stickyEnabled) defaultCategories else defaultCategories.filter { it != "Sticky" }
+        (base + custom).distinct()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, defaultCategories)
 
     fun addCustomCategory(category: String) {
         val trimmed = category.trim()
@@ -174,12 +184,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkPermissions(context: Context) {
         val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            androidx.core.content.ContextCompat.checkSelfPermission(
+            val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
                 context,
                 android.Manifest.permission.POST_NOTIFICATIONS
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val areEnabled = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
+            hasPermission && areEnabled
         } else {
-            true
+            androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled()
         }
         _isNotificationPermissionGranted.value = notificationGranted
 
@@ -289,10 +301,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /**
+     * Set of date strings (yyyy-MM-dd) that contain active scheduled tasks.
+     */
+    val taskDates: StateFlow<Set<String>> = repository.getAllTasks()
+        .map { tasks -> tasks.filter { !it.isCompleted }.map { it.dateAdded }.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /**
      * Get tasks list flow for a specific date (used by the smooth sliding HorizontalPager).
      */
     fun getTasksForDateFlow(dateStr: String): Flow<List<Task>> {
-        return repository.getTasksForDate(dateStr)
+        return repository.getAllTasks()
+            .map { allTasks ->
+                if (!_isStickyEnabled.value) {
+                    return@map allTasks.filter { it.dateAdded == dateStr && !it.category.equals("Sticky", ignoreCase = true) }
+                }
+
+                val directTasksForDate = allTasks.filter { it.dateAdded == dateStr }
+                val stickyMasters = allTasks
+                    .filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+                    .groupBy { it.title.trim().lowercase(java.util.Locale.ROOT) }
+                    .mapValues { (_, instances) -> instances.minByOrNull { it.dateAdded }!! }
+                    .values
+                    .filter { master ->
+                        master.dateAdded <= dateStr && (!master.isCompleted || master.dateAdded == dateStr)
+                    }
+
+                val combined = directTasksForDate.toMutableList()
+                stickyMasters.forEach { master ->
+                    val alreadyHasDirect = directTasksForDate.any {
+                        it.category?.equals("Sticky", ignoreCase = true) == true &&
+                        it.title.equals(master.title, ignoreCase = true)
+                    }
+                    if (!alreadyHasDirect) {
+                        combined.add(master.copy(dateAdded = dateStr, id = 0))
+                    }
+                }
+                combined
+            }
             .combine(_sortingOption) { taskList, sort ->
                 when (sort) {
                     SortOption.PRIORITY -> taskList.sortedBy { it.priority }
@@ -395,38 +441,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 scheduleExactReminder(scheduledTask)
             }
 
-            // Replicate to custom selected future dates
-            replicateDates.forEach { futureDate ->
-                if (futureDate != dateStr) {
-                    val futureReminderTime: Long? = if (reminderTimeMillis != null) {
-                        val futureCal = Calendar.getInstance().apply {
-                            time = DateTimeUtils.parseDbDate(futureDate) ?: Date()
-                            val origCal = Calendar.getInstance().apply { timeInMillis = reminderTimeMillis }
-                            set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
-                            set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }
-                        futureCal.timeInMillis
-                    } else null
+            // Replicate to custom selected future dates (bypassed for Sticky category)
+            if (!category.equals("Sticky", ignoreCase = true)) {
+                replicateDates.forEach { futureDate ->
+                    if (futureDate != dateStr) {
+                        val futureReminderTime: Long? = if (reminderTimeMillis != null) {
+                            val futureCal = Calendar.getInstance().apply {
+                                time = DateTimeUtils.parseDbDate(futureDate) ?: Date()
+                                val origCal = Calendar.getInstance().apply { timeInMillis = reminderTimeMillis }
+                                set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
+                                set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
+                            futureCal.timeInMillis
+                        } else null
 
-                    val futureTask = baseTask.copy(
-                        dateAdded = futureDate,
-                        isRecurring = false,
-                        reminderTime = futureReminderTime,
-                        nextReminderTime = futureReminderTime,
-                        reminderType = reminderType,
-                        snoozedUntil = null
-                    )
-                    val newId = repository.insertTask(futureTask).toInt()
-                    if (futureReminderTime != null && futureReminderTime > System.currentTimeMillis()) {
-                        scheduleExactReminder(futureTask.copy(id = newId))
+                        val futureTask = baseTask.copy(
+                            dateAdded = futureDate,
+                            isRecurring = false,
+                            reminderTime = futureReminderTime,
+                            nextReminderTime = futureReminderTime,
+                            reminderType = reminderType,
+                            snoozedUntil = null
+                        )
+                        val newId = repository.insertTask(futureTask).toInt()
+                        if (futureReminderTime != null && futureReminderTime > System.currentTimeMillis()) {
+                            scheduleExactReminder(futureTask.copy(id = newId))
+                        }
                     }
                 }
             }
 
-            // Replicate automatically to "everyday" range
-            if (everydayDaysCount > 0) {
+            // Replicate automatically to "everyday" range (bypassed for Sticky category)
+            if (everydayDaysCount > 0 && !category.equals("Sticky", ignoreCase = true)) {
                 for (i in 1..everydayDaysCount) {
                     val runCal = Calendar.getInstance().apply {
                         time = targetDate.time
@@ -465,6 +513,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Terminate a Sticky task forever from current date onward.
+     */
+    fun terminateStickyTaskForever(task: Task) {
+        viewModelScope.launch {
+            val updatedCurrent = task.copy(isCompleted = true, snoozedUntil = null)
+            if (task.id == 0) {
+                repository.insertTask(updatedCurrent)
+            } else {
+                repository.updateTask(updatedCurrent)
+            }
+
+            val allTasks = repository.getAllTasksDirect()
+            val targetTitle = task.title.trim()
+            val currentDateAdded = task.dateAdded
+            allTasks.forEach { t ->
+                if (t.category.equals("Sticky", ignoreCase = true) &&
+                    t.title.trim().equals(targetTitle, ignoreCase = true) &&
+                    t.dateAdded > currentDateAdded
+                ) {
+                    repository.deleteTask(t)
+                    NotificationReceiver.cancelReminder(getApplication(), t)
+                }
+            }
+            updateWidget()
+        }
+    }
+
+    /**
      * Complete task.
      */
     fun toggleCompleted(task: Task) {
@@ -481,13 +557,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 updated
             }
-            repository.updateTask(updatedWithReset)
-            
-            // Cancel alarm if marked completed
-            if (updatedWithReset.isCompleted) {
-                cancelReminder(updatedWithReset)
-            } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
-                scheduleExactReminder(updatedWithReset)
+
+            if (task.id == 0) {
+                val newId = repository.insertTask(updatedWithReset).toInt()
+                val insertedTask = updatedWithReset.copy(id = newId)
+                if (insertedTask.isCompleted) {
+                    cancelReminder(insertedTask)
+                } else if (insertedTask.reminderTime != null && insertedTask.reminderTime > System.currentTimeMillis()) {
+                    scheduleExactReminder(insertedTask)
+                }
+            } else {
+                repository.updateTask(updatedWithReset)
+                if (updatedWithReset.isCompleted) {
+                    cancelReminder(updatedWithReset)
+                } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
+                    scheduleExactReminder(updatedWithReset)
+                }
             }
             updateWidget()
         }

@@ -40,6 +40,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -87,6 +92,7 @@ class MainActivity : ComponentActivity() {
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        viewModel.checkPermissions(this)
         if (!isGranted) {
             Toast.makeText(this, "Reminders won't show notifications without permissions", Toast.LENGTH_LONG).show()
         }
@@ -208,14 +214,21 @@ fun MainLayout(
         colorfulSatScale = colorfulSatScale,
         onSetActiveScreen = { viewModel.setActiveScreen(it) },
         onNavigateDate = { viewModel.navigateDate(it) },
+        onSetDate = { viewModel.setDate(it) },
         onToggleSorting = {
             viewModel.toggleSorting()
             val label = if (sortOption == SortOption.PRIORITY) "Sequence chronological" else "Priority list levels"
             Toast.makeText(viewModel.getApplication(), "Sorted by $label", Toast.LENGTH_SHORT).show()
         },
-        screenContent = { onOpenDrawer ->
+        screenContent = { onOpenDrawer, isInlineCalendarExpanded, onToggleInlineCalendar ->
             when (activeScreen) {
-                Screen.HOME     -> HomeScreen(viewModel, onOpenDrawer, colorSchemeType)
+                Screen.HOME -> HomeScreen(
+                    viewModel = viewModel,
+                    onOpenDrawer = onOpenDrawer,
+                    colorSchemeType = colorSchemeType,
+                    isInlineCalendarExpanded = isInlineCalendarExpanded,
+                    onToggleInlineCalendar = onToggleInlineCalendar
+                )
                 Screen.HISTORY  -> HistoryScreen(
                     viewModel = viewModel,
                     colorSchemeType = colorSchemeType,
@@ -247,11 +260,13 @@ fun MainLayoutContent(
     colorfulSatScale: Float = 1f,
     onSetActiveScreen: (Screen) -> Unit,
     onNavigateDate: (Int) -> Unit,
+    onSetDate: (Calendar) -> Unit = {},
     onToggleSorting: () -> Unit,
-    screenContent: @Composable (onOpenDrawer: () -> Unit) -> Unit
+    screenContent: @Composable (onOpenDrawer: () -> Unit, isInlineCalendarExpanded: Boolean, onToggleInlineCalendar: () -> Unit) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    var isInlineCalendarExpanded by rememberSaveable { mutableStateOf(false) }
 
     if (activeScreen != Screen.HOME) {
         androidx.activity.compose.BackHandler {
@@ -285,43 +300,109 @@ fun MainLayoutContent(
                         CenterAlignedTopAppBar(
                         title = {
                             if (activeScreen == Screen.HOME) {
-                                // Center consumed by Date and arrows to navigate dates
+                                val isToday = DateTimeUtils.isToday(focusDate)
+                                val todayCal = Calendar.getInstance().apply {
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val focusCalNorm = Calendar.getInstance().apply {
+                                    time = focusDate.time
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                val isPast = focusCalNorm.before(todayCal)
+                                val isFuture = focusCalNorm.after(todayCal)
+
+                                val highlightLeft = !isToday && isFuture
+                                val highlightRight = !isToday && isPast
+
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    // Faint Left Date Increment
-                                    IconButton(
-                                        onClick = { onNavigateDate(-1) },
-                                        modifier = Modifier.alpha(0.6f)
+                                    // Left Date Navigation Icon (Highlights if focusDate is in future)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (highlightLeft) MaterialTheme.colorScheme.primaryContainer
+                                                else Color.Transparent
+                                            )
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onTap = { onNavigateDate(-1) },
+                                                    onLongPress = {
+                                                        onSetDate(Calendar.getInstance())
+                                                    }
+                                                )
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.KeyboardArrowLeft,
-                                            contentDescription = "Previous Day",
+                                            contentDescription = "Previous Day (Long press to Jump to Today)",
+                                            tint = if (highlightLeft) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
-                                    
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    // Center Date Title (Clickable to toggle Inline Calendar)
                                     val headerText = when {
                                         DateTimeUtils.isToday(focusDate) -> "Today"
                                         DateTimeUtils.isYesterday(focusDate) -> "Yesterday"
                                         DateTimeUtils.isTomorrow(focusDate) -> "Tomorrow"
                                         else -> DateTimeUtils.formatMainHeader(focusDate)
                                     }
-                                    Text(
-                                        text = headerText,
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
 
-                                    // Faint Right Date Increment
-                                    IconButton(
-                                        onClick = { onNavigateDate(1) },
-                                        modifier = Modifier.alpha(0.6f)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { isInlineCalendarExpanded = !isInlineCalendarExpanded }
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = headerText,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Icon(
+                                            imageVector = if (isInlineCalendarExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Toggle Calendar",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    // Right Date Navigation Icon (Highlights if focusDate is in past)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (highlightRight) MaterialTheme.colorScheme.primaryContainer
+                                                else Color.Transparent
+                                            )
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onTap = { onNavigateDate(1) },
+                                                    onLongPress = {
+                                                        onSetDate(Calendar.getInstance())
+                                                    }
+                                                )
+                                            },
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.KeyboardArrowRight,
-                                            contentDescription = "Next Day",
+                                            contentDescription = "Next Day (Long press to Jump to Today)",
+                                            tint = if (highlightRight) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -387,7 +468,11 @@ fun MainLayoutContent(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    screenContent { coroutineScope.launch { drawerState.open() } }
+                    screenContent(
+                { coroutineScope.launch { drawerState.open() } },
+                isInlineCalendarExpanded,
+                { isInlineCalendarExpanded = !isInlineCalendarExpanded }
+            )
                 }
             }
         }
@@ -559,7 +644,7 @@ fun MainLayoutPreview() {
             onSetActiveScreen = {},
             onNavigateDate = {},
             onToggleSorting = {},
-            screenContent = {
+            screenContent = { _, _, _ ->
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Main Layout Preview Content")
                 }

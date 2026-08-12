@@ -67,6 +67,11 @@ fun SettingsScreen(
     viewModel: MainViewModel,
     colorSchemeType: String
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.checkPermissions(context)
+    }
+
     val activeTheme by viewModel.settingsTheme.collectAsState()
     val activeScheme by viewModel.settingsColorScheme.collectAsState()
     val activeInterval by viewModel.settingsReminderInterval.collectAsState()
@@ -85,6 +90,8 @@ fun SettingsScreen(
         }
     }
 
+    val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
+
     SettingsScreenContent(
         activeTheme = activeTheme,
         activeScheme = activeScheme,
@@ -93,11 +100,13 @@ fun SettingsScreen(
         isNotificationPermissionGranted = isNotificationGranted,
         colorfulHueShift = colorfulHueShift,
         colorfulSatScale = colorfulSatScale,
+        isStickyEnabled = isStickyEnabled,
         onThemeChange = { viewModel.setTheme(it) },
         onSchemeChange = { viewModel.setColorScheme(it) },
         onIntervalChange = { viewModel.setReminderInterval(it) },
         onHueShiftChange = { viewModel.setColorfulHueShift(it) },
         onSatScaleChange = { viewModel.setColorfulSatScale(it) },
+        onStickyEnabledChange = { viewModel.setStickyEnabled(it) },
         onExportJson = { outputStream ->
             try {
                 val json = viewModel.exportBackup()
@@ -152,14 +161,16 @@ fun SettingsScreenContent(
     isNotificationPermissionGranted: Boolean,
     colorfulHueShift: Float = 0f,
     colorfulSatScale: Float = 1f,
-    onThemeChange: (String) -> Unit,
-    onSchemeChange: (String) -> Unit,
-    onIntervalChange: (Int) -> Unit,
+    isStickyEnabled: Boolean = true,
+    onThemeChange: (String) -> Unit = {},
+    onSchemeChange: (String) -> Unit = {},
+    onIntervalChange: (Int) -> Unit = {},
     onHueShiftChange: (Float) -> Unit = {},
     onSatScaleChange: (Float) -> Unit = {},
-    onExportJson: (java.io.OutputStream) -> Boolean,
-    onExportDb: (java.io.OutputStream) -> Boolean,
-    onImportBackup: (Uri, (Boolean, isDb: Boolean) -> Unit) -> Unit,
+    onStickyEnabledChange: (Boolean) -> Unit = {},
+    onExportJson: (java.io.OutputStream) -> Boolean = { false },
+    onExportDb: (java.io.OutputStream) -> Boolean = { false },
+    onImportBackup: (Uri, (Boolean, Boolean) -> Unit) -> Unit = { _, _ -> },
     ringtoneUri: String?,
     onRingtoneClick: () -> Unit
 ) {
@@ -196,6 +207,62 @@ fun SettingsScreenContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Feature Preferences Container (Sticky Tasks Toggle)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "Feature Preferences",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Enable Sticky Tasks System",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Show pinned habits and sticky tasks across Home and History screens. Disabling hides all sticky features without altering database records.",
+                                fontSize = AppFontSizes.extraSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = isStickyEnabled,
+                        onCheckedChange = onStickyEnabledChange
+                    )
+                }
+            }
+        }
+
         // Theme & Scheme Configuration Container
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -874,7 +941,7 @@ private fun getRingtoneTitle(context: Context, uriString: String?): String {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, heightDp = 1800)
 @Composable
 fun SettingsScreenPreview() {
     SoftTodoTheme {

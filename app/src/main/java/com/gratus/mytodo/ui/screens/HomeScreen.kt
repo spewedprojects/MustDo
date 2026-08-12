@@ -61,6 +61,7 @@ import com.gratus.mytodo.ui.MainViewModel
 import com.gratus.mytodo.ui.SortOption
 import com.gratus.mytodo.ui.components.TaskAddDialog
 import com.gratus.mytodo.ui.components.FaintBackground
+import com.gratus.mytodo.ui.components.InlineCalendarView
 import com.gratus.mytodo.ui.components.getCategoryIcon
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
@@ -80,11 +81,19 @@ sealed interface HomeListItem {
 fun HomeScreen(
     viewModel: MainViewModel,
     onOpenDrawer: () -> Unit,
-    colorSchemeType: String
+    colorSchemeType: String,
+    isInlineCalendarExpanded: Boolean = false,
+    onToggleInlineCalendar: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.checkPermissions(context)
+    }
+
     val currentDate by viewModel.currentDate.collectAsState()
     val lastUsedPriority by viewModel.lastUsedPriority.collectAsState()
     val sortOption by viewModel.sortingOption.collectAsState()
+    val taskDates by viewModel.taskDates.collectAsState()
 
     val showAddDialog by viewModel.showAddDialog.collectAsState()
     val taskToEdit by viewModel.taskToEdit.collectAsState()
@@ -93,6 +102,8 @@ fun HomeScreen(
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
     val copiedTask by viewModel.copiedTask.collectAsState()
     val customCategories by viewModel.customCategories.collectAsState()
+
+    val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
@@ -106,6 +117,7 @@ fun HomeScreen(
         copiedTask = copiedTask,
         customCategories = customCategories,
         sortOption = sortOption,
+        isStickyEnabled = isStickyEnabled,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -123,7 +135,11 @@ fun HomeScreen(
         onAddCustomCategory = { viewModel.addCustomCategory(it) },
         onDeleteCustomCategory = { viewModel.deleteCustomCategory(it) },
         onToggleSubComplete = { task, index -> viewModel.toggleSubTaskCompleted(task, index) },
-        getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) }
+        getTasksForDate = { dateStr -> viewModel.getTasksForDateFlow(dateStr) },
+        isInlineCalendarExpanded = isInlineCalendarExpanded,
+        onToggleInlineCalendar = onToggleInlineCalendar,
+        taskDates = taskDates,
+        onTerminateForever = { viewModel.terminateStickyTaskForever(it) }
     )
 }
 
@@ -143,7 +159,8 @@ fun HomeScreenContent(
     copiedTask: CopiedTask?,
     customCategories: List<String>,
     sortOption: SortOption = SortOption.PRIORITY,
-    onShowAddDialogChange: (Boolean) -> Unit,
+    isStickyEnabled: Boolean = true,
+    onShowAddDialogChange: (Boolean) -> Unit = {},
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
     onNavigateDate: (Int) -> Unit,
@@ -156,7 +173,11 @@ fun HomeScreenContent(
     onAddCustomCategory: (String) -> Unit,
     onDeleteCustomCategory: (String) -> Unit,
     onToggleSubComplete: (Task, Int) -> Unit,
-    getTasksForDate: (String) -> Flow<List<Task>>
+    getTasksForDate: (String) -> Flow<List<Task>>,
+    isInlineCalendarExpanded: Boolean = false,
+    onToggleInlineCalendar: () -> Unit = {},
+    taskDates: Set<String> = emptySet(),
+    onTerminateForever: ((Task) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val preselectedCategory = remember { mutableStateOf<String?>(null) }
@@ -293,57 +314,61 @@ fun HomeScreenContent(
                 }
             }
 
-            // Screen Header Label Display
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface
-                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-                    )
-                    .clickable {
-                        // Launch full native datepicker when tapping focused date card
-                        DatePickerDialog(
-                            context,
-                            { _, y, m, d ->
-                                val cal = Calendar.getInstance().apply {
-                                    set(Calendar.YEAR, y)
-                                    set(Calendar.MONTH, m)
-                                    set(Calendar.DAY_OF_MONTH, d)
-                                }
-                                onSetDate(cal)
-                            },
-                            currentDate.get(Calendar.YEAR),
-                            currentDate.get(Calendar.MONTH),
-                            currentDate.get(Calendar.DAY_OF_MONTH)
-                        ).show()
-                    }
-                    .padding(vertical = 12.dp, horizontal = 16.dp),
-                contentAlignment = Alignment.Center
+            // Screen Header Label Display - now redundant. TODO -> strip off in next release
+//            Row(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 16.dp, vertical = 2.dp)
+//                    .clip(RoundedCornerShape(12.dp))
+//                    .clickable { onToggleInlineCalendar() }
+//                    .padding(horizontal = 8.dp, vertical = 6.dp),
+//                horizontalArrangement = Arrangement.SpaceBetween,
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Row(
+//                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+//                    verticalAlignment = Alignment.CenterVertically
+//                ) {
+//                    Icon(
+//                        imageVector = Icons.Default.DateRange,
+//                        contentDescription = "Pick a Date",
+//                        tint = MaterialTheme.colorScheme.primary,
+//                        modifier = Modifier.size(18.dp)
+//                    )
+//                    Text(
+//                        text = DateTimeUtils.formatHomeDateLabel(currentDate),
+//                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+//                        color = MaterialTheme.colorScheme.onSurface
+//                    )
+//                    Text(
+//                        text = if (isInlineCalendarExpanded) " (Tap to Collapse)" else " (Tap for Calendar)",
+//                        style = MaterialTheme.typography.bodySmall,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+//                    )
+//                }
+//
+//                Icon(
+//                    imageVector = if (isInlineCalendarExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+//                    contentDescription = "Toggle Calendar",
+//                    tint = MaterialTheme.colorScheme.primary,
+//                    modifier = Modifier.size(20.dp)
+//                )
+//            }
+
+            AnimatedVisibility(
+                visible = isInlineCalendarExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DateRange,
-                        contentDescription = "Pick a Date",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(
-                        text = DateTimeUtils.formatHomeDateLabel(currentDate),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = " (Tap to Pick)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
+                InlineCalendarView(
+                    selectedDate = currentDate,
+                    onDateSelected = { cal ->
+                        onSetDate(cal)
+                        onToggleInlineCalendar()
+                    },
+                    taskDates = taskDates,
+                    colorSchemeType = colorSchemeType
+                )
             }
 
             // Smooth sliding horizontal pager
@@ -396,8 +421,15 @@ fun HomeScreenContent(
                             }
                         }
                     } else {
-                        val groupedTasks = remember(pageTasks) {
-                            pageTasks.groupBy { it.category }
+                        val stickyTasks = remember(pageTasks, isStickyEnabled) {
+                            if (!isStickyEnabled) emptyList()
+                            else pageTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+                        }
+                        val regularTasks = remember(pageTasks) {
+                            pageTasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
+                        }
+                        val groupedTasks = remember(regularTasks) {
+                            regularTasks.groupBy { it.category }
                         }
                         val collapsedCategories = remember { mutableStateMapOf<String, Boolean>() }
                         val homeListItems = remember(groupedTasks, sortOption) {
@@ -451,6 +483,47 @@ fun HomeScreenContent(
                             contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Top Sticky Section
+                            if (stickyTasks.isNotEmpty()) {
+                                item(key = "sticky_section") {
+                                    CategoryCard(
+                                        category = "Sticky",
+                                        tasks = stickyTasks,
+                                        isExpanded = true,
+                                        onToggleExpand = {},
+                                        onQuickAdd = {
+                                            preselectedCategory.value = "Sticky"
+                                            onShowAddDialogChange(true)
+                                        },
+                                        colorSchemeType = colorSchemeType
+                                    ) {
+                                        stickyTasks.forEachIndexed { index, task ->
+                                            TaskItemCard(
+                                                task = task,
+                                                colorSchemeType = colorSchemeType,
+                                                isFlat = true,
+                                                onToggleComplete = { onToggleComplete(task) },
+                                                onDelete = { onTaskToDeleteChange(task) },
+                                                onLongClick = { onTaskToEditChange(task) },
+                                                onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
+                                            )
+                                            if (index < stickyTasks.size - 1) {
+                                                HorizontalDivider(
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                                    thickness = 1.dp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                item(key = "sticky_divider") {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                                        thickness = 2.dp
+                                    )
+                                }
+                            }
                             items(homeListItems, key = { item ->
                                 when (item) {
                                     is HomeListItem.CategoryGroup -> "category_card_${item.category}"
@@ -589,22 +662,25 @@ fun HomeScreenContent(
         TaskAddDialog(
             initialDate = currentDate,
             lastUsedPriority = lastUsedPriority,
+            colorSchemeType = colorSchemeType,
             onDismiss = {
                 onShowAddDialogChange(false)
                 preselectedCategory.value = null
             },
-            onConfirm = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+            onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
                 onAddTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
                 onShowAddDialogChange(false)
                 preselectedCategory.value = null
                 Toast.makeText(context, "Task created!", Toast.LENGTH_SHORT).show()
             },
+            onEditTask = onEditTask,
+            onTerminateForever = onTerminateForever,
             preselectedCategory = preselectedCategory.value,
             copiedTask = copiedTask,
             onCopy = onCopy,
             customCategories = customCategories,
-            onAddCustomCategory = onAddCustomCategory,
-            onDeleteCustomCategory = onDeleteCustomCategory
+            onAddCategory = onAddCustomCategory,
+            onDeleteCategory = onDeleteCustomCategory
         )
     }
 
@@ -615,18 +691,25 @@ fun HomeScreenContent(
                 time = DateTimeUtils.parseDbDate(taskToEdit.dateAdded) ?: Date()
             },
             lastUsedPriority = lastUsedPriority,
+            colorSchemeType = colorSchemeType,
             taskToEdit = taskToEdit,
             onDismiss = { onTaskToEditChange(null) },
-            onConfirm = { t, d, p, targetDate, _, _, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
-                onEditTask(taskToEdit, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
+            onAddTask = onAddTask,
+            onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
+                onEditTask(task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
+            },
+            onTerminateForever = { task ->
+                onTerminateForever?.invoke(task)
+                onTaskToEditChange(null)
+                Toast.makeText(context, "Sticky task terminated!", Toast.LENGTH_SHORT).show()
             },
             copiedTask = copiedTask,
             onCopy = onCopy,
             customCategories = customCategories,
-            onAddCustomCategory = onAddCustomCategory,
-            onDeleteCustomCategory = onDeleteCustomCategory
+            onAddCategory = onAddCustomCategory,
+            onDeleteCategory = onDeleteCustomCategory
         )
     }
 

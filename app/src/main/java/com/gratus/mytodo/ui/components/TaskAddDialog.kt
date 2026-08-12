@@ -84,27 +84,18 @@ import java.util.*
 fun TaskAddDialog(
     initialDate: Calendar,
     lastUsedPriority: Int,
+    colorSchemeType: String = "minimal",
     onDismiss: () -> Unit,
-    onConfirm: (
-        title: String,
-        description: String,
-        priority: Int,
-        targetDate: Calendar,
-        replicateDates: List<String>,
-        everydayCount: Int,
-        reminderTimeMillis: Long?,
-        repeatCount: Int,
-        subTasks: List<SubTask>,
-        category: String?,
-        reminderType: String
-    ) -> Unit,
+    onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onTerminateForever: ((Task) -> Unit)? = null,
     taskToEdit: Task? = null,
     preselectedCategory: String? = null,
     copiedTask: CopiedTask? = null,
     onCopy: ((CopiedTask) -> Unit)? = null,
     customCategories: List<String> = emptyList(),
-    onAddCustomCategory: (String) -> Unit = {},
-    onDeleteCustomCategory: (String) -> Unit = {}
+    onAddCategory: (String) -> Unit = {},
+    onDeleteCategory: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -122,7 +113,6 @@ fun TaskAddDialog(
     var reminderType by rememberSaveable { mutableStateOf(taskToEdit?.reminderType ?: "notification") }
     var repeatCount by rememberSaveable { mutableStateOf(taskToEdit?.repeatCount ?: 1) }
 
-    var selectedCategory by remember { mutableStateOf(taskToEdit?.category ?: preselectedCategory) }
     var subTasksList by remember { mutableStateOf(taskToEdit?.subTasks ?: emptyList()) }
     var showAddCategoryDialog by remember { mutableStateOf(false) }
 
@@ -130,6 +120,15 @@ fun TaskAddDialog(
     var everydayCount by rememberSaveable { mutableStateOf(0) } // 0 = none, 7 = week, 14, 30
     var replicationDates by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showRangePickerDialog by rememberSaveable { mutableStateOf(false) }
+
+    var selectedCategory by remember { mutableStateOf(taskToEdit?.category ?: preselectedCategory) }
+    val isStickyCategory = selectedCategory?.equals("Sticky", ignoreCase = true) == true
+
+    LaunchedEffect(selectedCategory) {
+        if (selectedCategory?.equals("Sticky", ignoreCase = true) == true && everydayCount == 0) {
+            everydayCount = 30
+        }
+    }
 
     // Calendar instances for rendering next 7 days clone option
     val nextDays = remember {
@@ -523,7 +522,7 @@ fun TaskAddDialog(
                                     showCategoryDropdown = false
                                 }
                             )
-                            val defaultCats = listOf("Personal", "Work", "Errands", "Health", "Learning")
+                            val defaultCats = listOf("Sticky", "Personal", "Work", "Errands", "Health", "Learning")
                             val allCategories = (defaultCats + customCategories).distinct()
                             allCategories.forEach { cat ->
                                 DropdownMenuItem(
@@ -543,7 +542,7 @@ fun TaskAddDialog(
                                         {
                                             IconButton(
                                                 onClick = {
-                                                    onDeleteCustomCategory(cat)
+                                                    onDeleteCategory(cat)
                                                     if (selectedCategory == cat) {
                                                         selectedCategory = null
                                                     }
@@ -966,56 +965,71 @@ fun TaskAddDialog(
                 if (taskToEdit == null) {
                     Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                    // Everyday recurrence auto-add option
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Auto-Add Everyday",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val intervals = listOf(
-                                Pair(0, "No"),
-                                Pair(7, "Next 7 Days"),
-                                Pair(14, "Next 14 Days"),
-                                Pair(30, "Next 30 Days")
+                    if (!isStickyCategory) {
+                        // Everyday recurrence auto-add option
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Auto-Add Everyday",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
 
-                            intervals.forEach { (days, label) ->
-                                val selected = everydayCount == days
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (selected) MaterialTheme.colorScheme.primaryContainer 
-                                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val intervals = listOf(
+                                    Pair(0, "No"),
+                                    Pair(7, "Next 7 Days"),
+                                    Pair(14, "Next 14 Days"),
+                                    Pair(30, "Next 30 Days")
+                                )
+
+                                intervals.forEach { (days, label) ->
+                                    val selected = everydayCount == days
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (selected) MaterialTheme.colorScheme.primaryContainer 
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (selected) MaterialTheme.colorScheme.primary 
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                                RoundedCornerShape(8.dp)
+                                            )
+                                            .clickable { everydayCount = days }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            textAlign = TextAlign.Center,
+                                            fontSize = AppFontSizes.extraSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
+                                                    else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1
                                         )
-                                        .border(
-                                            1.dp,
-                                            if (selected) MaterialTheme.colorScheme.primary 
-                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .clickable { everydayCount = days }
-                                        .padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = label,
-                                        textAlign = TextAlign.Center,
-                                        fontSize = AppFontSizes.extraSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                                else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1
-                                    )
+                                    }
                                 }
                             }
+                        }
+                    } else {
+                        // Sticky category preselects Everyday (30 Days) by default
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Sticky Task Schedule",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Sticky tasks are auto-scheduled everyday across future dates.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
 
@@ -1118,6 +1132,33 @@ fun TaskAddDialog(
 
                 } // End of scrollable Column
 
+                if (taskToEdit != null && isStickyCategory && onTerminateForever != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            onTerminateForever(taskToEdit)
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Mark Complete Forever (Terminate)",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Footer Actions
@@ -1213,19 +1254,34 @@ fun TaskAddDialog(
                                 Toast.makeText(context, "Please enter a task title", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
-                            onConfirm(
-                                title.trim(),
-                                descriptionValue.text.trim(),
-                                priority,
-                                initialDate,
-                                replicationDates.toList(),
-                                everydayCount,
-                                reminderTimestamp,
-                                repeatCount,
-                                subTasksList,
-                                selectedCategory,
-                                reminderType
-                            )
+                            if (taskToEdit == null) {
+                                onAddTask(
+                                    title.trim(),
+                                    descriptionValue.text.trim(),
+                                    priority,
+                                    initialDate,
+                                    replicationDates.toList(),
+                                    everydayCount,
+                                    reminderTimestamp,
+                                    repeatCount,
+                                    subTasksList,
+                                    selectedCategory,
+                                    reminderType
+                                )
+                            } else {
+                                onEditTask(
+                                    taskToEdit,
+                                    title.trim(),
+                                    descriptionValue.text.trim(),
+                                    priority,
+                                    initialDate,
+                                    reminderTimestamp,
+                                    repeatCount,
+                                    subTasksList,
+                                    selectedCategory,
+                                    reminderType
+                                )
+                            }
                         },
                         modifier = Modifier.testTag("task_confirm_button")
                     ) {
@@ -1268,7 +1324,7 @@ fun TaskAddDialog(
                     onClick = {
                         val name = categoryInputText.trim()
                         if (name.isNotBlank()) {
-                            onAddCustomCategory(name)
+                            onAddCategory(name)
                             selectedCategory = name
                         }
                         showAddCategoryDialog = false
@@ -1472,7 +1528,8 @@ fun TaskAddDialogNewTaskPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -1485,7 +1542,8 @@ fun TaskAddDialogEditTaskPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask
         )
     }
@@ -1499,7 +1557,8 @@ fun TaskAddDialogSubtasksPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask.copy(
                 subTasks = listOf(
                     SubTask("Completed Subtask", true),
@@ -1519,7 +1578,8 @@ fun TaskAddDialogSimplePreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 2,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -1532,7 +1592,8 @@ fun TaskAddDialogColorfulDarkPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 3,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -1545,7 +1606,8 @@ fun TaskAddDialogRecurringAlarmPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask.copy(
                 isRecurring = true,
                 repeatCount = 3,
@@ -1564,7 +1626,8 @@ fun TaskAddDialogHighPriorityPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> }
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -1577,7 +1640,8 @@ fun TaskAddDialogScheduledTaskPreview() {
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 2,
             onDismiss = {},
-            onConfirm = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask.copy(
                 title = "Team Sync Meeting",
                 description = "Discuss weekly progress and updates",
