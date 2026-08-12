@@ -197,6 +197,16 @@ class AlarmService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val stopAllIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_STOP_ALL_ALARMS
+        }
+        val stopAllPendingIntent = PendingIntent.getService(
+            this,
+            9997,
+            stopAllIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val titleText = if (tasks.size == 1) {
             "Alarm: ${tasks[0].title}"
         } else {
@@ -217,8 +227,10 @@ class AlarmService : Service() {
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(contentPendingIntent)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            .setDeleteIntent(stopAllPendingIntent)
+            .addAction(R.drawable.icon_v3_notif, "Stop Alarm", stopAllPendingIntent)
+            .setOngoing(false)
+            .setAutoCancel(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
     }

@@ -58,13 +58,20 @@ import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.data.CopiedTask
 import com.gratus.mytodo.data.SubTask
 import com.gratus.mytodo.ui.MainViewModel
+import com.gratus.mytodo.ui.SortOption
 import com.gratus.mytodo.ui.components.TaskAddDialog
+import com.gratus.mytodo.ui.components.FaintBackground
 import com.gratus.mytodo.ui.components.getCategoryIcon
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import kotlinx.coroutines.flow.Flow
 import java.util.*
+
+sealed interface HomeListItem {
+    data class CategoryGroup(val category: String, val tasks: List<Task>) : HomeListItem
+    data class TaglessTask(val task: Task) : HomeListItem
+}
 
 /**
  * HomeScreen displays the current date's tasks, supporting the date swipe gesture.
@@ -77,6 +84,7 @@ fun HomeScreen(
 ) {
     val currentDate by viewModel.currentDate.collectAsState()
     val lastUsedPriority by viewModel.lastUsedPriority.collectAsState()
+    val sortOption by viewModel.sortingOption.collectAsState()
 
     val showAddDialog by viewModel.showAddDialog.collectAsState()
     val taskToEdit by viewModel.taskToEdit.collectAsState()
@@ -97,6 +105,7 @@ fun HomeScreen(
         isNotificationPermissionGranted = isNotificationGranted,
         copiedTask = copiedTask,
         customCategories = customCategories,
+        sortOption = sortOption,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -133,6 +142,7 @@ fun HomeScreenContent(
     isNotificationPermissionGranted: Boolean,
     copiedTask: CopiedTask?,
     customCategories: List<String>,
+    sortOption: SortOption = SortOption.PRIORITY,
     onShowAddDialogChange: (Boolean) -> Unit,
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -390,11 +400,48 @@ fun HomeScreenContent(
                             pageTasks.groupBy { it.category }
                         }
                         val collapsedCategories = remember { mutableStateMapOf<String, Boolean>() }
-                        val categorized = remember(groupedTasks) {
-                            groupedTasks.filterKeys { it != null }.toSortedMap(compareBy { it!! })
-                        }
-                        val uncategorized = remember(groupedTasks) {
-                            groupedTasks[null] ?: emptyList()
+                        val homeListItems = remember(groupedTasks, sortOption) {
+                            val items = mutableListOf<HomeListItem>()
+                            
+                            groupedTasks.filterKeys { it != null }.forEach { (cat, tasks) ->
+                                items.add(HomeListItem.CategoryGroup(cat!!, tasks))
+                            }
+                            
+                            val uncategorizedTasks = groupedTasks[null] ?: emptyList()
+                            uncategorizedTasks.forEach { task ->
+                                items.add(HomeListItem.TaglessTask(task))
+                            }
+                            
+                            if (sortOption == SortOption.PRIORITY) {
+                                items.sortedWith(
+                                    compareBy<HomeListItem> { item ->
+                                        when (item) {
+                                            is HomeListItem.CategoryGroup -> {
+                                                val pending = item.tasks.filter { !it.isCompleted }
+                                                pending.minOfOrNull { it.priority } ?: item.tasks.minOfOrNull { it.priority } ?: 4
+                                            }
+                                            is HomeListItem.TaglessTask -> {
+                                                if (item.task.isCompleted) 5 else item.task.priority
+                                            }
+                                        }
+                                    }.thenBy { item ->
+                                        when (item) {
+                                            is HomeListItem.CategoryGroup -> item.tasks.map { it.priority }.average()
+                                            is HomeListItem.TaglessTask -> item.task.priority.toDouble()
+                                        }
+                                    }.thenBy { item ->
+                                        when (item) {
+                                            is HomeListItem.CategoryGroup -> item.category
+                                            is HomeListItem.TaglessTask -> item.task.title
+                                        }
+                                    }
+                                )
+                            } else {
+                                val (categories, tagless) = items.partition { it is HomeListItem.CategoryGroup }
+                                val sortedCategories = categories.sortedBy { (it as HomeListItem.CategoryGroup).category }
+                                val sortedTagless = tagless.sortedBy { (it as HomeListItem.TaglessTask).task.createdSeq }
+                                sortedCategories + sortedTagless
+                            }
                         }
 
                         LazyColumn(
@@ -404,58 +451,59 @@ fun HomeScreenContent(
                             contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // 1. Categorized Tasks
-                            categorized.forEach { (category, tasks) ->
-                                val catName = category ?: ""
-                                val isCollapsed = collapsedCategories[catName] == true
-                                
-                                item(key = "category_card_$catName") {
-                                    CategoryCard(
-                                        category = catName,
-                                        tasks = tasks,
-                                        isExpanded = !isCollapsed,
-                                        onToggleExpand = {
-                                            collapsedCategories[catName] = !isCollapsed
-                                        },
-                                        onQuickAdd = {
-                                            preselectedCategory.value = catName
-                                            onShowAddDialogChange(true)
-                                        },
-                                        colorSchemeType = colorSchemeType
-                                    ) {
-                                        tasks.forEachIndexed { index, task ->
-                                            TaskItemCard(
-                                                task = task,
-                                                colorSchemeType = colorSchemeType,
-                                                isFlat = true,
-                                                onToggleComplete = { onToggleComplete(task) },
-                                                onDelete = { onTaskToDeleteChange(task) },
-                                                onLongClick = { onTaskToEditChange(task) },
-                                                onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
-                                            )
-                                            if (index < tasks.size - 1) {
-                                                HorizontalDivider(
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                                    thickness = 1.dp
+                            items(homeListItems, key = { item ->
+                                when (item) {
+                                    is HomeListItem.CategoryGroup -> "category_card_${item.category}"
+                                    is HomeListItem.TaglessTask -> "task_${item.task.id}"
+                                }
+                            }) { item ->
+                                when (item) {
+                                    is HomeListItem.CategoryGroup -> {
+                                        val catName = item.category
+                                        val isCollapsed = collapsedCategories[catName] == true
+                                        CategoryCard(
+                                            category = catName,
+                                            tasks = item.tasks,
+                                            isExpanded = !isCollapsed,
+                                            onToggleExpand = {
+                                                collapsedCategories[catName] = !isCollapsed
+                                            },
+                                            onQuickAdd = {
+                                                preselectedCategory.value = catName
+                                                onShowAddDialogChange(true)
+                                            },
+                                            colorSchemeType = colorSchemeType
+                                        ) {
+                                            item.tasks.forEachIndexed { index, task ->
+                                                TaskItemCard(
+                                                    task = task,
+                                                    colorSchemeType = colorSchemeType,
+                                                    isFlat = true,
+                                                    onToggleComplete = { onToggleComplete(task) },
+                                                    onDelete = { onTaskToDeleteChange(task) },
+                                                    onLongClick = { onTaskToEditChange(task) },
+                                                    onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
                                                 )
+                                                if (index < item.tasks.size - 1) {
+                                                    HorizontalDivider(
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                                        thickness = 1.dp
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            }
-                            
-                            // 2. Uncategorized Tasks
-                            if (uncategorized.isNotEmpty()) {
-                                items(uncategorized, key = { "task_${it.id}" }) { task ->
-                                    TaskItemCard(
-                                        task = task,
-                                        colorSchemeType = colorSchemeType,
-                                        isFlat = false,
-                                        onToggleComplete = { onToggleComplete(task) },
-                                        onDelete = { onTaskToDeleteChange(task) },
-                                        onLongClick = { onTaskToEditChange(task) },
-                                        onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
-                                    )
+                                    is HomeListItem.TaglessTask -> {
+                                        TaskItemCard(
+                                            task = item.task,
+                                            colorSchemeType = colorSchemeType,
+                                            isFlat = false,
+                                            onToggleComplete = { onToggleComplete(item.task) },
+                                            onDelete = { onTaskToDeleteChange(item.task) },
+                                            onLongClick = { onTaskToEditChange(item.task) },
+                                            onToggleSubComplete = { subIdx -> onToggleSubComplete(item.task, subIdx) }
+                                        )
+                                    }
                                 }
                             }
                         }

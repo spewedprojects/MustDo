@@ -14,14 +14,14 @@ android {
         applicationId = "com.gratus.mytodo"
         minSdk = 27
         targetSdk = 36
-        versionCode = 23
-        versionName = "6.7.1"
+        versionCode = 24
+        versionName = "6.7.2"
 
         // Pass versionName to the app as a resource
         resValue(
             type = "string",
             name = "app_version",
-            value = "v" + versionName!! + " (" + versionCode!! + ")"
+            value = "v${versionName}(${versionCode})"
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -398,8 +398,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Replicate to custom selected future dates
             replicateDates.forEach { futureDate ->
                 if (futureDate != dateStr) {
-                    val futureTask = baseTask.copy(dateAdded = futureDate, isRecurring = false, reminderTime = null, nextReminderTime = null, reminderType = reminderType, snoozedUntil = null)
-                    repository.insertTask(futureTask)
+                    val futureReminderTime: Long? = if (reminderTimeMillis != null) {
+                        val futureCal = Calendar.getInstance().apply {
+                            time = DateTimeUtils.parseDbDate(futureDate) ?: Date()
+                            val origCal = Calendar.getInstance().apply { timeInMillis = reminderTimeMillis }
+                            set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
+                            set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        futureCal.timeInMillis
+                    } else null
+
+                    val futureTask = baseTask.copy(
+                        dateAdded = futureDate,
+                        isRecurring = false,
+                        reminderTime = futureReminderTime,
+                        nextReminderTime = futureReminderTime,
+                        reminderType = reminderType,
+                        snoozedUntil = null
+                    )
+                    val newId = repository.insertTask(futureTask).toInt()
+                    if (futureReminderTime != null && futureReminderTime > System.currentTimeMillis()) {
+                        scheduleExactReminder(futureTask.copy(id = newId))
+                    }
                 }
             }
 
@@ -411,8 +433,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         add(Calendar.DAY_OF_YEAR, i)
                     }
                     val dailyStr = DateTimeUtils.formatDbDate(runCal)
-                    val everydayTask = baseTask.copy(dateAdded = dailyStr, isRecurring = true, reminderTime = null, nextReminderTime = null, reminderType = reminderType, snoozedUntil = null)
-                    repository.insertTask(everydayTask)
+                    val futureReminderTime: Long? = if (reminderTimeMillis != null) {
+                        val futureCal = Calendar.getInstance().apply {
+                            time = runCal.time
+                            val origCal = Calendar.getInstance().apply { timeInMillis = reminderTimeMillis }
+                            set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
+                            set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        futureCal.timeInMillis
+                    } else null
+
+                    val everydayTask = baseTask.copy(
+                        dateAdded = dailyStr,
+                        isRecurring = true,
+                        reminderTime = futureReminderTime,
+                        nextReminderTime = futureReminderTime,
+                        reminderType = reminderType,
+                        snoozedUntil = null
+                    )
+                    val newId = repository.insertTask(everydayTask).toInt()
+                    if (futureReminderTime != null && futureReminderTime > System.currentTimeMillis()) {
+                        scheduleExactReminder(everydayTask.copy(id = newId))
+                    }
                 }
             }
 
