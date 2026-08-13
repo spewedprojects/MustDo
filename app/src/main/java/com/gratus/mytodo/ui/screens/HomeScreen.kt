@@ -121,6 +121,7 @@ fun HomeScreen(
     val taskToDelete by viewModel.taskToDelete.collectAsState()
     val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
+    val isFullScreenGranted by viewModel.isFullScreenPermissionGranted.collectAsState()
     val copiedTask by viewModel.copiedTask.collectAsState()
     val customCategories by viewModel.customCategories.collectAsState()
 
@@ -135,6 +136,7 @@ fun HomeScreen(
         taskToDelete = taskToDelete,
         isAlarmPermissionGranted = isAlarmGranted,
         isNotificationPermissionGranted = isNotificationGranted,
+        isFullScreenPermissionGranted = isFullScreenGranted,
         copiedTask = copiedTask,
         customCategories = customCategories,
         sortOption = sortOption,
@@ -177,6 +179,7 @@ fun HomeScreenContent(
     taskToDelete: Task?,
     isAlarmPermissionGranted: Boolean,
     isNotificationPermissionGranted: Boolean,
+    isFullScreenPermissionGranted: Boolean = true,
     copiedTask: CopiedTask?,
     customCategories: List<String>,
     sortOption: SortOption = SortOption.PRIORITY,
@@ -238,10 +241,11 @@ fun HomeScreenContent(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
+            if (!isAlarmPermissionGranted || !isNotificationPermissionGranted || !isFullScreenPermissionGranted) {
                 PermissionWarningCard(
                     isAlarmPermissionGranted = isAlarmPermissionGranted,
                     isNotificationPermissionGranted = isNotificationPermissionGranted,
+                    isFullScreenPermissionGranted = isFullScreenPermissionGranted,
                     colorSchemeType = colorSchemeType,
                     context = context
                 )

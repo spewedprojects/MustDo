@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 
@@ -89,13 +91,15 @@ fun FeaturePreferencesCard(
                     )
                     Column {
                         Text(
-                            text = "Enable Sticky Tasks System",
+                            text = "Enable Sticky Tasks",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Enable and sticky tasks. Disabling hides all sticky features without altering database records.",
-                            fontSize = AppFontSizes.extraSmall,
+                            fontSize = AppFontSizes.small,
+                            lineHeight = 18.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }

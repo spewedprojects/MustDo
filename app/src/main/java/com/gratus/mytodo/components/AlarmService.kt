@@ -67,7 +67,10 @@ class AlarmService : Service() {
                     CoroutineScope(Dispatchers.IO).launch {
                         val db = TaskDatabase.getDatabase(applicationContext)
                         val task = db.taskDao().getTaskById(taskId)
-                        if (task != null && !task.isCompleted && task.isReminderActive) {
+                        val sharedPrefs = applicationContext.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                        val isStickyEnabled = sharedPrefs.getBoolean("enable_sticky_tasks", true)
+                        val isStickyTask = task?.category?.equals("Sticky", ignoreCase = true) == true
+                        if (task != null && !task.isCompleted && task.isReminderActive && !(isStickyTask && !isStickyEnabled)) {
                             withContext(Dispatchers.Main) {
                                 if (!AlarmState.activeTasks.any { it.id == taskId }) {
                                     AlarmState.activeTasks.add(task)
@@ -84,10 +87,14 @@ class AlarmService : Service() {
                                 }
                                 
                                 // Launch AlarmActivity
-                                val activityIntent = Intent(this@AlarmService, AlarmActivity::class.java).apply {
-                                    this.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                try {
+                                    val activityIntent = Intent(this@AlarmService, AlarmActivity::class.java).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    }
+                                    startActivity(activityIntent)
+                                } catch (e: Exception) {
+                                    android.util.Log.w("AlarmService", "Failed direct startActivity: ${e.message}")
                                 }
-                                startActivity(activityIntent)
                             }
                         }
                     }
@@ -178,7 +185,7 @@ class AlarmService : Service() {
 
     private fun buildNotification(tasks: List<Task>): android.app.Notification {
         val openIntent = Intent(this, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val contentPendingIntent = PendingIntent.getActivity(
             this,
@@ -188,7 +195,7 @@ class AlarmService : Service() {
         )
 
         val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val fullScreenPendingIntent = PendingIntent.getActivity(
             this,
@@ -247,7 +254,7 @@ class AlarmService : Service() {
                 enableLights(true)
                 lightColor = android.graphics.Color.RED
                 setSound(null, null)
-                enableVibration(false)
+                enableVibration(true)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     setBypassDnd(true)
                 }

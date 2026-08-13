@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import java.io.OutputStream
 
@@ -78,7 +79,8 @@ fun BackupsRestorationsCard(
 
             Text(
                 text = "Import or export your list entries easily. Alarms will be rescheduled cleanly upon successful restore.",
-                fontSize = AppFontSizes.extraSmall,
+                fontSize = AppFontSizes.small,
+                lineHeight = 18.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
 

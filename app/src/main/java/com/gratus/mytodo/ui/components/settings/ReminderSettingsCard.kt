@@ -69,7 +69,8 @@ fun ReminderSettingsCard(
     context: Context,
     onIntervalChange: (Int) -> Unit,
     onRingtoneClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isFullScreenPermissionGranted: Boolean = true
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -88,7 +89,7 @@ fun ReminderSettingsCard(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     text = "System Permissions Status",
                     style = MaterialTheme.typography.titleSmall,
@@ -177,7 +178,57 @@ fun ReminderSettingsCard(
                     }
                 }
 
-                if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
+                // Full Screen Alarms Permission Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                            } else {
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", context.packageName, null)
+                                }
+                            }
+                            try { context.startActivity(intent) } catch (_: Exception) {
+                                try {
+                                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.fromParts("package", context.packageName, null)
+                                    })
+                                } catch (_: Exception) {}
+                            }
+                        }
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Full Screen Alarms",
+                        fontSize = AppFontSizes.medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (isFullScreenPermissionGranted) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (isFullScreenPermissionGranted) "Active" else "Disabled",
+                            color = if (isFullScreenPermissionGranted) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            fontSize = AppFontSizes.extraSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                if (!isAlarmPermissionGranted || !isNotificationPermissionGranted || !isFullScreenPermissionGranted) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Change in System Settings",
@@ -190,7 +241,7 @@ fun ReminderSettingsCard(
                                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                         data = Uri.fromParts("package", context.packageName, null)
                                     }
-                                } else {
+                                } else if (!isAlarmPermissionGranted) {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                         Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                                             data = Uri.fromParts("package", context.packageName, null)
@@ -200,14 +251,19 @@ fun ReminderSettingsCard(
                                             data = Uri.fromParts("package", context.packageName, null)
                                         }
                                     }
+                                } else {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                            data = Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    } else {
+                                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.fromParts("package", context.packageName, null)
+                                        }
+                                    }
                                 }
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
-                                }
+                                try { context.startActivity(intent) } catch (_: Exception) {}
                             }
-                            .padding(vertical = 4.dp)
                     )
                 }
             }

@@ -14,14 +14,14 @@ android {
         applicationId = "com.gratus.mytodo"
         minSdk = 27
         targetSdk = 36
-        versionCode = 27
-        versionName = "6.8.2"
+        versionCode = 29
+        versionName = "7.0.0"
 
         // Pass versionName to the app as a resource
         resValue(
             type = "string",
             name = "app_version",
-            value = "v${versionName}(${versionCode})"
+            value = "v${versionName} (${versionCode})"
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -69,6 +69,19 @@ android {
         resValues = true
     }
     testOptions { unitTests { isIncludeAndroidResources = true } }
+}
+
+androidComponents {
+    onVariants { variant ->
+        val baseName = if (variant.buildType == "debug") {
+            "MustDo_${variant.buildType}"
+        } else {
+            "MustDo_v${android.defaultConfig.versionName}-${variant.buildType}"
+        }
+        variant.outputs.forEach { output ->
+            (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set("$baseName.apk")
+        }
+    }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

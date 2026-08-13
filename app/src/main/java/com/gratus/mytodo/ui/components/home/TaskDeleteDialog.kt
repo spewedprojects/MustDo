@@ -42,6 +42,14 @@ fun TaskDeleteDialog(
     onDismiss: () -> Unit,
     onConfirmDelete: (Task) -> Unit
 ) {
+    val isStickyTask = taskToDelete.category?.equals("Sticky", ignoreCase = true) == true
+    val titleText = if (isStickyTask) "Delete Sticky Task" else "Delete Task"
+    val bodyText = if (isStickyTask) {
+        "Are you sure you want to delete this sticky task? This will permanently remove it and all of its occurrences from the database."
+    } else {
+        "Are you sure you want to delete this task?"
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.border(
@@ -56,8 +64,8 @@ fun TaskDeleteDialog(
             shape = RoundedCornerShape(28.dp)
         ),
         containerColor = MaterialTheme.colorScheme.dialogContainerColor,
-        title = { Text("Delete Task", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-        text = { Text("Are you sure you want to delete this task?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+        title = { Text(titleText, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+        text = { Text(bodyText, color = MaterialTheme.colorScheme.onSurfaceVariant) },
         confirmButton = {
             TextButton(
                 onClick = {

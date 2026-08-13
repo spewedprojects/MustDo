@@ -24,3 +24,23 @@
 -keep class com.gratus.mytodo.widget.** { *; }
 -keep class * extends android.widget.RemoteViewsService { *; }
 -keep class * implements android.widget.RemoteViewsService$RemoteViewsFactory { *; }
+
+# Keep Room database entities, DAOs, and data models
+-keep class com.gratus.mytodo.data.** { *; }
+-keepclassmembers class com.gratus.mytodo.data.** { *; }
+
+# Keep Activities
+-keep class com.gratus.mytodo.AlarmActivity { *; }
+-keep class com.gratus.mytodo.SnoozeActivity { *; }
+-keep class com.gratus.mytodo.MainActivity { *; }
+
+# Keep BroadcastReceivers and Services
+-keep class com.gratus.mytodo.components.** { *; }
+-keepclassmembers class com.gratus.mytodo.components.** { *; }
+-keep class com.gratus.mytodo.components.AlarmState { *; }
+
+# Keep MainViewModel and state flows
+-keep class com.gratus.mytodo.ui.MainViewModel { *; }
+
+# Keep annotations and generic signatures for reflection (Room / Moshi)
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod

@@ -77,16 +77,18 @@ class AlarmActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                        or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                        or android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                        or android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-            )
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+            keyguardManager?.requestDismissKeyguard(this, null)
         }
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        @Suppress("DEPRECATION")
+        window.addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    or android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    or android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    or android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    or android.view.WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
+        )
+
 
         val sharedPrefs = getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
         val themeMode = sharedPrefs.getString("theme", "auto") ?: "auto"

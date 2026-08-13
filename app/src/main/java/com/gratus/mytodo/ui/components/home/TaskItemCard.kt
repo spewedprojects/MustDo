@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Snooze
+import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -232,6 +234,44 @@ fun TaskItemCard(
                         )
                     }
                 }
+
+                // Show Sticky Task Everyday or Deadline indicator below Scheduled Alarm indicator
+                if (task.category?.equals("Sticky", ignoreCase = true) == true) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val deadline = task.deadlineDate
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (deadline.isNullOrBlank()) Icons.Default.Autorenew else Icons.Default.Event,
+                            contentDescription = if (deadline.isNullOrBlank()) "Everyday sticky task" else "Sticky task deadline",
+                            tint = if (isCompleted) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            },
+                            modifier = Modifier.size(12.dp)
+                        )
+                        val textStr = if (deadline.isNullOrBlank()) {
+                            "Everyday"
+                        } else {
+                            val parsedDate = DateTimeUtils.parseDbDate(deadline)
+                            val formattedDate = if (parsedDate != null) DateTimeUtils.formatMainHeader(parsedDate) else deadline
+                            "Deadline: $formattedDate"
+                        }
+                        Text(
+                            text = textStr,
+                            fontSize = AppFontSizes.micro,
+                            color = if (isCompleted) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.tertiary
+                            },
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             // Priority level displayed inside a boxed container colored based on active colorSchemeType
@@ -343,54 +383,69 @@ private val sampleTasks = listOf(
     Task(
         id = 1,
         title = "Finish Project Proposal",
-        description = "Finalize the budget and timeline",
+        description = "Finalize the budget and project timeline",
         priority = 1,
-        dateAdded = "2023-10-27",
+        dateAdded = "2026-08-13",
         category = "Work",
-        subTasks = listOf(SubTask("Draft budget", true), SubTask("Set timeline", false))
+        reminderTime = System.currentTimeMillis() + 3600000,
+        subTasks = listOf(SubTask("Draft budget spreadsheet", true), SubTask("Review timeline with team", false))
     ),
     Task(
         id = 2,
         title = "Grocery Shopping",
         description = "Milk, Eggs, Bread, Fruits",
         priority = 2,
-        dateAdded = "2023-10-27",
+        dateAdded = "2026-08-13",
         isCompleted = true,
-        category = "Errands"
+        category = "Errands",
+        subTasks = listOf(SubTask("Milk & Organic Eggs", true), SubTask("Whole Wheat Bread", true))
     ),
     Task(
         id = 3,
-        title = "Gym Workout",
-        description = "Leg day",
-        priority = 3,
-        dateAdded = "2023-10-27",
-        category = "Fitness"
+        title = "Daily Morning Pushups & Stretch",
+        description = "50 reps before breakfast",
+        priority = 2,
+        dateAdded = "2026-08-13",
+        category = "Sticky",
+        isRecurring = true
     ),
     Task(
         id = 4,
-        title = "Walk the dog",
-        description = "Around the park",
+        title = "Walk the dog in park",
+        description = "Evening 20 min walk",
         priority = 4,
-        dateAdded = "2023-10-27"
+        dateAdded = "2026-08-13"
+    ),
+    Task(
+        id = 5,
+        title = "Security Compliance Audit",
+        description = "Check API key rotation & permissions",
+        priority = 1,
+        dateAdded = "2026-08-13",
+        reminderTime = System.currentTimeMillis() - 100000,
+        snoozedUntil = System.currentTimeMillis() + 1800000,
+        category = "Work"
     )
 )
 
-@Preview(showBackground = true, name = "Task Item Card")
+@Preview(showBackground = true, name = "Task Card - High Priority & Subtasks (Minimal Light)")
 @Composable
-fun TaskItemCardPreview() {
-    SoftTodoTheme(colorSchemeType = "colorful") {
-        TaskItemCard(
-            task = sampleTasks[0],
-            colorSchemeType = "colorful",
-            onToggleComplete = {},
-            onDelete = {},
-            onLongClick = {},
-            onToggleSubComplete = {}
-        )
+fun TaskItemCardHighPriorityWithSubtasksPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[0],
+                colorSchemeType = "minimal",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
     }
 }
 
-@Preview(showBackground = true, name = "Task Item Card - Completed")
+@Preview(showBackground = true, name = "Task Card - Completed State (Minimal Light)")
 @Composable
 fun TaskItemCardCompletedPreview() {
     SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
@@ -407,14 +462,66 @@ fun TaskItemCardCompletedPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Task Item Card - Low Priority")
+@Preview(showBackground = true, name = "Task Card - Sticky Everyday Task")
 @Composable
-fun TaskItemCardLowPriorityPreview() {
+fun TaskItemCardStickyEverydayPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[2],
+                colorSchemeType = "minimal",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Task Card - Snoozed Reminder Alert")
+@Composable
+fun TaskItemCardSnoozedAlarmPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[4],
+                colorSchemeType = "minimal",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Task Card - Colorful Dark Theme")
+@Composable
+fun TaskItemCardColorfulDarkPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            TaskItemCard(
+                task = sampleTasks[0],
+                colorSchemeType = "colorful",
+                onToggleComplete = {},
+                onDelete = {},
+                onLongClick = {},
+                onToggleSubComplete = {}
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Task Card - Low Priority Flat List Item")
+@Composable
+fun TaskItemCardLowPriorityFlatPreview() {
     SoftTodoTheme(colorSchemeType = "simple", themeMode = "light") {
         Box(modifier = Modifier.padding(16.dp)) {
             TaskItemCard(
                 task = sampleTasks[3],
                 colorSchemeType = "simple",
+                isFlat = true,
                 onToggleComplete = {},
                 onDelete = {},
                 onLongClick = {},

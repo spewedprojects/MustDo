@@ -132,8 +132,11 @@ class NotificationReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val task = db.taskDao().getTaskById(taskId)
+                    val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                    val isStickyEnabled = sharedPrefs.getBoolean("enable_sticky_tasks", true)
+                    val isStickyTask = task?.category?.equals("Sticky", ignoreCase = true) == true
                     
-                    if (task != null && !task.isCompleted && task.isReminderActive) {
+                    if (task != null && !task.isCompleted && task.isReminderActive && !(isStickyTask && !isStickyEnabled)) {
                         if (task.reminderType == "alarm") {
                             // Start Alarm Service
                             val serviceIntent = Intent(context, AlarmService::class.java).apply {
@@ -269,12 +272,15 @@ class NotificationReceiver : BroadcastReceiver() {
         fun rescheduleAllAlarms(context: Context) {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
+                    val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+                    val isStickyEnabled = sharedPrefs.getBoolean("enable_sticky_tasks", true)
                     val db = TaskDatabase.getDatabase(context)
                     val tasks = db.taskDao().getAllTasksDirect()
                     val currentTime = System.currentTimeMillis()
                     for (task in tasks) {
+                        val isStickyTask = task.category?.equals("Sticky", ignoreCase = true) == true
                         val time = task.nextReminderTime ?: task.reminderTime
-                        if (task.isCompleted || !task.isReminderActive || time == null || time <= currentTime) {
+                        if (task.isCompleted || !task.isReminderActive || time == null || time <= currentTime || (isStickyTask && !isStickyEnabled)) {
                             cancelReminder(context, task)
                         } else {
                             scheduleExactReminder(context, task)
@@ -287,6 +293,11 @@ class NotificationReceiver : BroadcastReceiver() {
         }
 
         fun scheduleExactReminder(context: Context, task: Task) {
+            val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+            val isStickyEnabled = sharedPrefs.getBoolean("enable_sticky_tasks", true)
+            val isStickyTask = task.category?.equals("Sticky", ignoreCase = true) == true
+            if (isStickyTask && !isStickyEnabled) return
+
             val time = task.nextReminderTime ?: task.reminderTime ?: return
             if (!task.isReminderActive || task.isCompleted) return
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -303,8 +314,8 @@ class NotificationReceiver : BroadcastReceiver() {
 
             try {
                 if (task.reminderType == "alarm") {
-                    val openIntent = Intent(context, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    val openIntent = Intent(context, AlarmActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     }
                     val showIntent = PendingIntent.getActivity(
                         context,

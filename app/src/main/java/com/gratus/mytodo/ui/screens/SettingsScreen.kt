@@ -76,6 +76,7 @@ fun SettingsScreen(
     val activeInterval by viewModel.settingsReminderInterval.collectAsState()
     val isAlarmGranted by viewModel.isAlarmPermissionGranted.collectAsState()
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
+    val isFullScreenGranted by viewModel.isFullScreenPermissionGranted.collectAsState()
     val alarmRingtoneUri by viewModel.settingsAlarmRingtone.collectAsState()
     val colorfulHueShift by viewModel.colorfulHueShift.collectAsState()
     val colorfulSatScale by viewModel.colorfulSatScale.collectAsState()
@@ -97,6 +98,7 @@ fun SettingsScreen(
         activeInterval = activeInterval,
         isAlarmPermissionGranted = isAlarmGranted,
         isNotificationPermissionGranted = isNotificationGranted,
+        isFullScreenPermissionGranted = isFullScreenGranted,
         colorfulHueShift = colorfulHueShift,
         colorfulSatScale = colorfulSatScale,
         isStickyEnabled = isStickyEnabled,
@@ -158,6 +160,7 @@ fun SettingsScreenContent(
     activeInterval: Int,
     isAlarmPermissionGranted: Boolean,
     isNotificationPermissionGranted: Boolean,
+    isFullScreenPermissionGranted: Boolean = true,
     colorfulHueShift: Float = 0f,
     colorfulSatScale: Float = 1f,
     isStickyEnabled: Boolean = true,
@@ -228,6 +231,7 @@ fun SettingsScreenContent(
         ReminderSettingsCard(
             isAlarmPermissionGranted = isAlarmPermissionGranted,
             isNotificationPermissionGranted = isNotificationPermissionGranted,
+            isFullScreenPermissionGranted = isFullScreenPermissionGranted,
             activeInterval = activeInterval,
             ringtoneUri = ringtoneUri,
             context = context,

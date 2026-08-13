@@ -135,6 +135,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setStickyEnabled(enabled: Boolean) {
         _isStickyEnabled.value = enabled
         sharedPrefs.edit().putBoolean("enable_sticky_tasks", enabled).apply()
+        NotificationReceiver.rescheduleAllAlarms(getApplication())
         updateWidget()
     }
 
@@ -182,6 +183,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isNotificationPermissionGranted = MutableStateFlow(true)
     val isNotificationPermissionGranted: StateFlow<Boolean> = _isNotificationPermissionGranted.asStateFlow()
 
+    private val _isFullScreenPermissionGranted = MutableStateFlow(true)
+    val isFullScreenPermissionGranted: StateFlow<Boolean> = _isFullScreenPermissionGranted.asStateFlow()
+
     fun checkPermissions(context: Context) {
         val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
@@ -198,14 +202,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val alarmGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             try {
-                alarmManager.canScheduleExactAlarms()
+                val granted = alarmManager.canScheduleExactAlarms()
+                android.util.Log.d("MainViewModel", "canScheduleExactAlarms returned: $granted")
+                granted
             } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Error checking canScheduleExactAlarms: ${e.message}", e)
                 false
             }
         } else {
             true
         }
         _isAlarmPermissionGranted.value = alarmGranted
+
+        val fullScreenGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val notifManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            if (notifManager != null) {
+                try {
+                    val method = notifManager.javaClass.getMethod("canUseFullScreenIntent")
+                    val granted = method.invoke(notifManager) as? Boolean ?: true
+                    android.util.Log.d("MainViewModel", "canUseFullScreenIntent returned: $granted")
+                    granted
+                } catch (e: Exception) {
+                    android.util.Log.w("MainViewModel", "Could not query canUseFullScreenIntent: ${e.message}")
+                    true
+                }
+            } else {
+                true
+            }
+        } else {
+            true
+        }
+        _isFullScreenPermissionGranted.value = fullScreenGranted
     }
 
     // Dialog / Edit Screen States (preserved across screen rotations)
@@ -324,7 +351,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .mapValues { (_, instances) -> instances.minByOrNull { it.dateAdded }!! }
                     .values
                     .filter { master ->
-                        master.dateAdded <= dateStr && (!master.isCompleted || master.dateAdded == dateStr)
+                        master.dateAdded <= dateStr &&
+                        (!master.isCompleted || master.dateAdded == dateStr) &&
+                        (master.deadlineDate.isNullOrBlank() || dateStr <= master.deadlineDate)
                     }
 
                 val combined = directTasksForDate.toMutableList()
@@ -411,6 +440,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             val dateStr = DateTimeUtils.formatDbDate(targetDate)
+            val computedDeadline: String? = if (category?.equals("Sticky", ignoreCase = true) == true) {
+                if (replicateDates.isNotEmpty()) {
+                    replicateDates.maxOrNull()
+                } else if (everydayDaysCount > 0) {
+                    val cal = Calendar.getInstance().apply {
+                        time = targetDate.time
+                        add(Calendar.DAY_OF_YEAR, everydayDaysCount)
+                    }
+                    DateTimeUtils.formatDbDate(cal)
+                } else {
+                    null
+                }
+            } else null
+
             val baseTask = Task(
                 title = title,
                 description = description,
@@ -426,7 +469,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 subTasks = subTasks,
                 category = category,
                 reminderType = reminderType,
-                snoozedUntil = null
+                snoozedUntil = null,
+                deadlineDate = computedDeadline
             )
 
             // Save last used priority
@@ -517,25 +561,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun terminateStickyTaskForever(task: Task) {
         viewModelScope.launch {
-            val updatedCurrent = task.copy(isCompleted = true, snoozedUntil = null)
-            if (task.id == 0) {
-                repository.insertTask(updatedCurrent)
-            } else {
-                repository.updateTask(updatedCurrent)
-            }
-
-            val allTasks = repository.getAllTasksDirect()
             val targetTitle = task.title.trim()
             val currentDateAdded = task.dateAdded
-            allTasks.forEach { t ->
-                if (t.category.equals("Sticky", ignoreCase = true) &&
-                    t.title.trim().equals(targetTitle, ignoreCase = true) &&
-                    t.dateAdded > currentDateAdded
-                ) {
-                    repository.deleteTask(t)
-                    NotificationReceiver.cancelReminder(getApplication(), t)
+            val allTasks = repository.getAllTasksDirect()
+
+            val matchingSticky = allTasks.filter {
+                it.category?.equals("Sticky", ignoreCase = true) == true &&
+                it.title.trim().equals(targetTitle, ignoreCase = true)
+            }
+
+            // Mark all past/current instances (including master task) as completed and disable reminders
+            matchingSticky.filter { it.dateAdded <= currentDateAdded }.forEach { t ->
+                val updated = t.copy(isCompleted = true, isReminderActive = false, snoozedUntil = null)
+                repository.updateTask(updated)
+                NotificationReceiver.cancelReminder(getApplication(), t)
+            }
+
+            // Delete any future occurrences (> currentDateAdded)
+            matchingSticky.filter { it.dateAdded > currentDateAdded }.forEach { t ->
+                repository.deleteTask(t)
+                NotificationReceiver.cancelReminder(getApplication(), t)
+            }
+
+            // If this was a virtual instance (id == 0), insert a completed instance for currentDateAdded if not already present
+            if (task.id == 0) {
+                val hasDirectForCurrentDate = matchingSticky.any { it.dateAdded == currentDateAdded }
+                if (!hasDirectForCurrentDate) {
+                    val terminatedInstance = task.copy(
+                        isCompleted = true,
+                        isReminderActive = false,
+                        snoozedUntil = null
+                    )
+                    repository.insertTask(terminatedInstance)
                 }
             }
+
             updateWidget()
         }
     }
@@ -663,11 +723,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Delete task completely from the logs.
+     * If task is a Sticky task, wipes master and all occurrences completely from the DB.
      */
     fun deleteTask(task: Task) {
         viewModelScope.launch {
-            repository.deleteTask(task)
-            cancelReminder(task)
+            if (task.category?.equals("Sticky", ignoreCase = true) == true) {
+                val targetTitle = task.title.trim()
+                val allTasks = repository.getAllTasksDirect()
+                val matchingSticky = allTasks.filter {
+                    it.category?.equals("Sticky", ignoreCase = true) == true &&
+                    it.title.trim().equals(targetTitle, ignoreCase = true)
+                }
+                if (matchingSticky.isNotEmpty()) {
+                    matchingSticky.forEach { t ->
+                        repository.deleteTask(t)
+                        cancelReminder(t)
+                    }
+                } else if (task.id != 0) {
+                    repository.deleteTask(task)
+                    cancelReminder(task)
+                }
+            } else {
+                repository.deleteTask(task)
+                cancelReminder(task)
+            }
             updateWidget()
         }
     }

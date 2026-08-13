@@ -192,7 +192,7 @@ fun HomeTasksPager(
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 4.dp),
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                thickness = 2.dp
+                                thickness = 1.dp
                             )
                         }
                     }

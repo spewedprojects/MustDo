@@ -57,7 +57,8 @@ fun PermissionWarningCard(
     isNotificationPermissionGranted: Boolean,
     colorSchemeType: String,
     context: Context,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isFullScreenPermissionGranted: Boolean = true
 ) {
     Card(
         modifier = modifier
@@ -110,8 +111,10 @@ fun PermissionWarningCard(
                     "Both Notification permission and Alarms & Reminders permission are required to trigger notifications for urgent scheduled tasks."
                 } else if (!isNotificationPermissionGranted) {
                     "Notification permission is required to trigger notifications for urgent scheduled tasks."
-                } else {
+                } else if (!isAlarmPermissionGranted) {
                     "Alarms & Reminders permission is required to schedule exact notifications for urgent tasks."
+                } else {
+                    "Full Screen Alarms permission is required to display full-screen alerts over lock screen."
                 },
                 fontSize = AppFontSizes.small,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -124,9 +127,19 @@ fun PermissionWarningCard(
                         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                             data = Uri.fromParts("package", context.packageName, null)
                         }
-                    } else {
+                    } else if (!isAlarmPermissionGranted) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        } else {
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                        }
+                    } else {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
                                 data = Uri.fromParts("package", context.packageName, null)
                             }
                         } else {
@@ -138,7 +151,13 @@ fun PermissionWarningCard(
                     try {
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                        try {
+                            context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            })
+                        } catch (e2: Exception) {
+                            Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 modifier = Modifier.align(Alignment.End),

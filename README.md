@@ -19,6 +19,8 @@ Home screen
     <td><img src="docs/screenshots/01.png" width="100%"></td>
     <td><img src="docs/screenshots/02.png" width="100%"></td>
     <td><img src="docs/screenshots/03.png" width="100%"></td>
+    <td><img src="docs/screenshots/24.png" width="100%"></td>
+    <td><img src="docs/screenshots/25.png" width="100%"></td>
   </tr>
 </table>
 
@@ -36,6 +38,7 @@ History Screen - Day, Week, Month and Year view
 <table>
   <tr>
     <td><img src="docs/screenshots/09.png" width="100%"></td>
+    <td><img src="docs/screenshots/09_1.png" width="100%"></td>
     <td><img src="docs/screenshots/10.png" width="100%"></td>
     <td><img src="docs/screenshots/11.png" width="100%"></td>
     <td><img src="docs/screenshots/12.png" width="100%"></td>

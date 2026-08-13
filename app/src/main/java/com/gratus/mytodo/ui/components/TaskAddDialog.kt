@@ -19,6 +19,8 @@
 package com.gratus.mytodo.ui.components
 
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -169,6 +171,7 @@ fun TaskAddDialogContent(
             .padding(vertical = 16.dp)
             .testTag("task_add_dialog_card"),
             shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(0.5f)),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.dialogContainerColor,
                 contentColor = MaterialTheme.colorScheme.onSurface
@@ -449,7 +452,7 @@ fun TaskAddDialogContent(
 @Preview(showBackground = true, name = "New Task Dialog - Minimal Light")
 @Composable
 fun TaskAddDialogMinimalLightPreview() {
-    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "dark") {
         TaskAddDialogContent(
             initialDate = Calendar.getInstance(),
             lastUsedPriority = 1,
