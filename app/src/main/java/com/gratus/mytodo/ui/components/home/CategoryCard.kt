@@ -160,7 +160,6 @@ fun CategoryCard(
                     )
                 }
             }
-            
             if (isExpanded) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -168,6 +167,25 @@ fun CategoryCard(
                 )
                 content()
             }
+        }
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Category Card")
+@Composable
+fun CategoryCardPreview() {
+    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+        CategoryCard(
+            category = "Work",
+            tasks = listOf(
+                Task(id = 1, title = "Task 1", description = "", priority = 1, dateAdded = "2026-08-13")
+            ),
+            isExpanded = true,
+            onToggleExpand = {},
+            onQuickAdd = {},
+            colorSchemeType = "minimal"
+        ) {
+            Text("Category Task Content", modifier = Modifier.padding(16.dp))
         }
     }
 }

@@ -42,7 +42,9 @@ import androidx.core.net.toUri
 import com.gratus.mytodo.BuildConfig
 import com.gratus.mytodo.R
 import com.gratus.mytodo.ui.Screen
+import androidx.compose.ui.tooling.preview.Preview
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -189,6 +191,19 @@ fun AppDrawerContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "App Navigation Drawer")
+@Composable
+fun AppDrawerContentPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        AppDrawerContent(
+            activeScreen = Screen.HOME,
+            colorSchemeType = "minimal",
+            onSetActiveScreen = {},
+            onCloseDrawer = {}
         )
     }
 }

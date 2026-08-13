@@ -35,8 +35,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.*
@@ -48,11 +50,11 @@ import java.util.*
  */
 @Composable
 fun InlineCalendarView(
+    modifier: Modifier = Modifier,
     selectedDate: Calendar,
     onDateSelected: (Calendar) -> Unit,
     taskDates: Set<String> = emptySet(),
-    colorSchemeType: String = "minimal",
-    modifier: Modifier = Modifier
+    colorSchemeType: String = "minimal"
 ) {
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
     
@@ -126,6 +128,7 @@ fun InlineCalendarView(
                         )
                     }
 
+                    Spacer(modifier = Modifier.width(4.dp))
                     IconButton(
                         onClick = {
                             val next = Calendar.getInstance().apply {
@@ -168,7 +171,7 @@ fun InlineCalendarView(
             val firstDayOfWeek = (currentMonthCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
             val totalGridSlots = ((daysInMonth + firstDayOfWeek + 6) / 7) * 7
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 var currentSlot = 0
                 while (currentSlot < totalGridSlots) {
                     Row(
@@ -250,5 +253,18 @@ fun InlineCalendarView(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = false, name = "Inline Calendar View")
+@Composable
+fun InlineCalendarViewPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        InlineCalendarView(
+            selectedDate = Calendar.getInstance(),
+            onDateSelected = {},
+            taskDates = setOf(DateTimeUtils.formatDbDate(Calendar.getInstance())),
+            colorSchemeType = "minimal"
+        )
     }
 }

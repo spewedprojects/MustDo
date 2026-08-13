@@ -43,6 +43,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.tooling.preview.Preview
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -278,5 +280,47 @@ fun MainLayoutContent(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Main Layout - Navigable Home Screen")
+@Composable
+fun MainLayoutContentNavigableHomePreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        MainLayoutContent(
+            activeScreen = Screen.HOME,
+            focusDate = Calendar.getInstance(),
+            sortOption = SortOption.PRIORITY,
+            colorSchemeType = "minimal",
+            onSetActiveScreen = {},
+            onNavigateDate = {},
+            onToggleSorting = {},
+            screenContent = { _, _, _ ->
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Home Screen Content Area")
+                }
+            }
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Main Layout - Navigable History Screen")
+@Composable
+fun MainLayoutContentNavigableHistoryPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal") {
+        MainLayoutContent(
+            activeScreen = Screen.HISTORY,
+            focusDate = Calendar.getInstance(),
+            sortOption = SortOption.PRIORITY,
+            colorSchemeType = "minimal",
+            onSetActiveScreen = {},
+            onNavigateDate = {},
+            onToggleSorting = {},
+            screenContent = { _, _, _ ->
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("History Screen Content Area")
+                }
+            }
+        )
     }
 }

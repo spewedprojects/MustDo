@@ -18,46 +18,35 @@
 
 package com.gratus.mytodo.ui.screens
 
-import android.content.ContentValues
-import android.content.Context
 import android.media.RingtoneManager
 import android.net.Uri
 import android.content.Intent
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.gratus.mytodo.ui.MainViewModel
+import com.gratus.mytodo.ui.components.settings.AestheticsSettingsCard
+import com.gratus.mytodo.ui.components.settings.BackupsRestorationsCard
+import com.gratus.mytodo.ui.components.settings.FeaturePreferencesCard
+import com.gratus.mytodo.ui.components.settings.ReminderSettingsCard
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
-import com.gratus.mytodo.ui.theme.AppFontSizes
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlin.text.format
 
 /**
  * SettingsScreen includes theme configurations, color scheme selectors, and backups.
@@ -67,9 +56,19 @@ fun SettingsScreen(
     viewModel: MainViewModel,
     colorSchemeType: String
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(Unit) {
-        viewModel.checkPermissions(context)
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.checkPermissions(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val activeTheme by viewModel.settingsTheme.collectAsState()
@@ -208,745 +207,72 @@ fun SettingsScreenContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Feature Preferences Container (Sticky Tasks Toggle)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Text(
-                    text = "Feature Preferences",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PushPin,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Column {
-                            Text(
-                                text = "Enable Sticky Tasks System",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Show pinned habits and sticky tasks across Home and History screens. Disabling hides all sticky features without altering database records.",
-                                fontSize = AppFontSizes.extraSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Switch(
-                        checked = isStickyEnabled,
-                        onCheckedChange = onStickyEnabledChange
-                    )
-                }
-            }
-        }
+        FeaturePreferencesCard(
+            isStickyEnabled = isStickyEnabled,
+            onStickyEnabledChange = onStickyEnabledChange
+        )
 
         // Theme & Scheme Configuration Container
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Aesthetics Settings",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                // Light / Dark / Auto selectors
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Theme Mode", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val themeList = listOf(
-                            Pair("auto", "System Auto"),
-                            Pair("light", "Light"),
-                            Pair("dark", "Dark")
-                        )
-
-                        themeList.forEach { (mode, label) ->
-                            val isSelected = activeTheme == mode
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary 
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { onThemeChange(mode) }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = AppFontSizes.small,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Color schemes options (Simple, Colorful, Monet)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(text = "Color Schemes Palette", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                    
-                    val schemes = listOf(
-                        Triple("minimal", "Clean Minimalism", "Lavender backing with space-blurry spheres, sleek borders, and elegant state indicators."),
-                        Triple("simple", "Simple B&W Only", "Black and white base, accents colored strictly around Priority levels."),
-                        Triple("colorful", "Pastel Colorful", "Soft pastel layers with faint radial sweeping neon screen background."),
-                        Triple("system", "System Monet", "Dynamic native Material You colors synched directly from Android 12+ wallpaper settings.")
-                    )
-
-                    schemes.forEach { (schemeKey, name, desc) ->
-                        val isSelected = activeScheme == schemeKey
-                        // Track whether the customize panel is expanded for this row
-                        var customizerExpanded by remember { mutableStateOf(false) }
-
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(if (customizerExpanded && schemeKey == "colorful") 12.dp else 12.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.secondary
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                        RoundedCornerShape(12.dp)
-                                    )
-                                    .clickable { onSchemeChange(schemeKey) }
-                                    .padding(14.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        modifier = Modifier.weight(1f),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.Top
-                                    ) {
-                                        Icon(
-                                            imageVector = when (schemeKey) {
-                                                "minimal"  -> Icons.Default.Spa
-                                                "simple"   -> Icons.Default.BrightnessLow
-                                                "colorful" -> Icons.Default.Palette
-                                                else       -> Icons.Default.SettingsSuggest
-                                            },
-                                            contentDescription = null,
-                                            tint = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Column {
-                                            Text(
-                                                text = name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = AppFontSizes.large,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = desc,
-                                                fontSize = AppFontSizes.small,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                                lineHeight = AppFontSizes.medium
-                                            )
-                                        }
-                                    }
-
-                                    // Palette customizer button — only shown for the colorful scheme
-                                    if (schemeKey == "colorful") {
-                                        IconButton(
-                                            onClick = {
-                                                onSchemeChange(schemeKey) // also select it
-                                                customizerExpanded = !customizerExpanded
-                                            },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Tune,
-                                                contentDescription = "Customize colorful palette",
-                                                tint = if (isSelected) MaterialTheme.colorScheme.secondary
-                                                       else MaterialTheme.colorScheme.outline,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                    }
-
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = { onSchemeChange(schemeKey) },
-                                        colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
-                                    )
-                                }
-                            }
-
-                            // Inline palette customizer panel, visible only for colorful scheme when expanded
-                            if (schemeKey == "colorful" && customizerExpanded) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                                            RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    // Live swatch preview strip
-                                    val previewPrimary   = MaterialTheme.colorScheme.primary
-                                    val previewSecondary = MaterialTheme.colorScheme.secondary
-                                    val previewTertiary  = MaterialTheme.colorScheme.tertiary
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Preview:",
-                                            fontSize = AppFontSizes.small,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        listOf(previewPrimary, previewSecondary, previewTertiary).forEach { swatch ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(20.dp)
-                                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                                    .background(swatch)
-                                                    .border(
-                                                        1.dp,
-                                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                                        androidx.compose.foundation.shape.CircleShape
-                                                    )
-                                            )
-                                        }
-                                    }
-
-                                    // Hue shift slider
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "Hue Shift",
-                                                fontSize = AppFontSizes.small,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = if (colorfulHueShift == 0f) "Default"
-                                                       else "%+.0f°".format(colorfulHueShift),
-                                                fontSize = AppFontSizes.small,
-                                                color = MaterialTheme.colorScheme.secondary
-                                            )
-                                        }
-                                        Slider(
-                                            value = colorfulHueShift,
-                                            onValueChange = onHueShiftChange,
-                                            valueRange = -80f..60f,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = MaterialTheme.colorScheme.secondary,
-                                                activeTrackColor = MaterialTheme.colorScheme.secondary
-                                            )
-                                        )
-                                    }
-
-                                    // Saturation scale slider
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "Saturation",
-                                                fontSize = AppFontSizes.small,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = if (colorfulSatScale == 1f) "Default"
-                                                       else "%.2f×".format(colorfulSatScale),
-                                                fontSize = AppFontSizes.small,
-                                                color = MaterialTheme.colorScheme.secondary
-                                            )
-                                        }
-                                        Slider(
-                                            value = colorfulSatScale,
-                                            onValueChange = onSatScaleChange,
-                                            valueRange = 0.7f..1.3f,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = MaterialTheme.colorScheme.secondary,
-                                                activeTrackColor = MaterialTheme.colorScheme.secondary
-                                            )
-                                        )
-                                    }
-
-                                    // Reset button
-                                    TextButton(
-                                        onClick = {
-                                            onHueShiftChange(0f)
-                                            onSatScaleChange(1f)
-                                        },
-                                        modifier = Modifier.align(Alignment.End)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Reset to Default",
-                                            fontSize = AppFontSizes.small
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        AestheticsSettingsCard(
+            activeTheme = activeTheme,
+            activeScheme = activeScheme,
+            colorfulHueShift = colorfulHueShift,
+            colorfulSatScale = colorfulSatScale,
+            onThemeChange = onThemeChange,
+            onSchemeChange = onSchemeChange,
+            onHueShiftChange = onHueShiftChange,
+            onSatScaleChange = onSatScaleChange
+        )
 
         // Reminder Settings Container
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Reminder Settings",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "System Permissions Status",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    // Alarms & Reminders Permission Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Alarms & Reminders",
-                            fontSize = AppFontSizes.medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isAlarmPermissionGranted) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (isAlarmPermissionGranted) "Active" else "Disabled",
-                                color = if (isAlarmPermissionGranted) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                fontSize = AppFontSizes.extraSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    // Notification Permission Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Notifications",
-                            fontSize = AppFontSizes.medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (isNotificationPermissionGranted) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (isNotificationPermissionGranted) "Active" else "Disabled",
-                                color = if (isNotificationPermissionGranted) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                fontSize = AppFontSizes.extraSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Change in System Settings",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = AppFontSizes.small,
-                            modifier = Modifier
-                                .clickable {
-                                    val intent = if (!isNotificationPermissionGranted) {
-                                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                            data = android.net.Uri.fromParts("package", context.packageName, null)
-                                        }
-                                    } else {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                            Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                                data = android.net.Uri.fromParts("package", context.packageName, null)
-                                            }
-                                        } else {
-                                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                                data = android.net.Uri.fromParts("package", context.packageName, null)
-                                            }
-                                        }
-                                    }
-                                    try {
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                                .padding(vertical = 4.dp)
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
-
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Reminder Repeat Interval",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Set how many minutes the alarm waits to repeat itself (applied to all repeat intervals).",
-                        fontSize = AppFontSizes.small,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        lineHeight = AppFontSizes.medium
-                    )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        val intervals = listOf(
-                            Pair(5, "5m"),
-                            Pair(10, "10m"),
-                            Pair(15, "15m"),
-                            Pair(30, "30m"),
-                            Pair(60, "60m")
-                        )
-
-                        intervals.forEach { (minutes, label) ->
-                            val isSelected = activeInterval == minutes
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                                    )
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary
-                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-                                        RoundedCornerShape(8.dp)
-                                    )
-                                    .clickable { onIntervalChange(minutes) }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = AppFontSizes.small,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                            else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.05f))
-
-                // Alarm ringtone configuration row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onRingtoneClick() }
-                        .padding(vertical = 4.dp, horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Alarm Ringtone",
-                            fontSize = AppFontSizes.medium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = getRingtoneTitle(context, ringtoneUri),
-                            fontSize = AppFontSizes.small,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.VolumeUp,
-                        contentDescription = "Select Alarm Tone",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
+        ReminderSettingsCard(
+            isAlarmPermissionGranted = isAlarmPermissionGranted,
+            isNotificationPermissionGranted = isNotificationPermissionGranted,
+            activeInterval = activeInterval,
+            ringtoneUri = ringtoneUri,
+            context = context,
+            onIntervalChange = onIntervalChange,
+            onRingtoneClick = onRingtoneClick
+        )
 
         // Backups & Exports Container
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Backups & Restorations",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
-
-                Text(
-                    text = "Import or export your list entries easily. Alarms will be rescheduled cleanly upon successful restore.",
-                    fontSize = AppFontSizes.extraSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-
-                // Actions Column
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Export to Device Button
-                    Button(
-                        onClick = {
-                            val jsonSuccess = saveBackupToDocuments(
-                                context,
-                                "todo_backup",
-                                ".json",
-                                "application/json"
-                            ) { output ->
-                                onExportJson(output)
-                            }
-
-                            val dbSuccess = saveBackupToDocuments(
-                                context,
-                                "todo_backup",
-                                ".db",
-                                "application/octet-stream"
-                            ) { output ->
-                                onExportDb(output)
-                            }
-                            if (jsonSuccess && dbSuccess) {
-                                Toast.makeText(
-                                    context,
-                                    "Backup files exported to Documents folder!",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } else if (jsonSuccess) {
-                                Toast.makeText(
-                                    context,
-                                    "JSON exported, but Database file export failed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else if (dbSuccess) {
-                                Toast.makeText(
-                                    context,
-                                    "Database exported, but JSON backup failed",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "Export failed. Please check storage.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("export_device_btn")
-                    ) {
-                        Icon(imageVector = Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Export to Device")
-                    }
-
-                    // Import & Restore Backup Button
-                    OutlinedButton(
-                        onClick = {
-                            importLauncher.launch("*/*")
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("import_file_btn")
-                    ) {
-                        Icon(imageVector = Icons.Default.SettingsBackupRestore, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Import & Restore Backup")
-                    }
-                }
-            }
-        }
+        BackupsRestorationsCard(
+            context = context,
+            importLauncher = importLauncher,
+            onExportJson = onExportJson,
+            onExportDb = onExportDb
+        )
     }
 }
 
-/**
- * Saves a backup file directly to the device's public Documents directory.
- * Appends the current date in yyyy-MM-dd format to the filename.
- */
-private fun saveBackupToDocuments(
-    context: Context,
-    baseFileName: String, // e.g., "todo_backup"
-    extension: String,     // e.g., ".json"
-    mimeType: String,
-    dataWriter: (java.io.OutputStream) -> Boolean
-): Boolean {
-    // 1. Prepare the date-stamped filename
-    val dateStamp = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    val fullFileName = "${baseFileName}_$dateStamp$extension"
-
-    val resolver = context.contentResolver
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, fullFileName)
-        put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Changed from DIRECTORY_DOWNLOADS to DIRECTORY_DOCUMENTS
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS + "/MustdoBackups")
-            put(MediaStore.MediaColumns.IS_PENDING, 1)
-        }
-    }
-    
-    val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        resolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
-    } else {
-        // Fallback for pre-Android 10 (Legacy Storage)
-        @Suppress("DEPRECATION")
-        val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS + "/MustdoBackups")
-        if (!docsDir.exists() && !docsDir.mkdirs()) return false
-        val file = File(docsDir, fullFileName)
-        try {
-            file.outputStream().use { return dataWriter(it) }
-        } catch (e: Exception) {
-            null
-        }
-    } ?: return false
-
-    var success = false
-    try {
-        resolver.openOutputStream(uri)?.use { output ->
-            success = dataWriter(output)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentValues.clear()
-            contentValues.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            resolver.update(uri, contentValues, null, null)
-        }
-    } catch (e: Exception) {
-        success = false
-    }
-    return success
-}
-
-private fun getRingtoneTitle(context: Context, uriString: String?): String {
-    if (uriString.isNullOrEmpty()) return "Default Alarm Tone"
-    return try {
-        val uri = Uri.parse(uriString)
-        val ringtone = RingtoneManager.getRingtone(context, uri)
-        ringtone?.getTitle(context) ?: "Unknown Tone"
-    } catch (e: Exception) {
-        "Default Alarm Tone"
-    }
-}
-
-@Preview(showBackground = true, heightDp = 1800)
+@Preview(showBackground = true, heightDp = 1800, name = "Settings Screen - Scrollable Light")
 @Composable
 fun SettingsScreenPreview() {
     SoftTodoTheme {
         SettingsScreenContent(
             activeTheme = "light",
+            activeScheme = "minimal",
+            activeInterval = 10,
+            isAlarmPermissionGranted = true,
+            isNotificationPermissionGranted = true,
+            onThemeChange = {},
+            onSchemeChange = {},
+            onIntervalChange = {},
+            onExportJson = { true },
+            onExportDb = { true },
+            onImportBackup = { _, _ -> },
+            ringtoneUri = null,
+            onRingtoneClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "Settings Screen - Navigable Dark Mode")
+@Composable
+fun SettingsScreenNavigableDarkPreview() {
+    SoftTodoTheme {
+        SettingsScreenContent(
+            activeTheme = "dark",
             activeScheme = "minimal",
             activeInterval = 10,
             isAlarmPermissionGranted = true,

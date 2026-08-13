@@ -20,6 +20,11 @@
 package com.gratus.mytodo.ui.screens
 
 import com.gratus.mytodo.ui.components.home.CategoryCard
+import com.gratus.mytodo.ui.components.home.EmptyTasksState
+import com.gratus.mytodo.ui.components.home.HomeFABGroup
+import com.gratus.mytodo.ui.components.home.HomeTasksPager
+import com.gratus.mytodo.ui.components.home.PermissionWarningCard
+import com.gratus.mytodo.ui.components.home.TaskDeleteDialog
 import com.gratus.mytodo.ui.components.home.TaskItemCard
 import com.gratus.mytodo.ui.components.home.borderStrokeSimple
 import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
@@ -92,8 +97,18 @@ fun HomeScreen(
     onToggleInlineCalendar: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        viewModel.checkPermissions(context)
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.checkPermissions(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val currentDate by viewModel.currentDate.collectAsState()
@@ -224,100 +239,12 @@ fun HomeScreenContent(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (!isAlarmPermissionGranted || !isNotificationPermissionGranted) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (colorSchemeType == "minimal") {
-                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
-                        } else if (colorSchemeType == "colorful") {
-                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        }
-                    ),
-                    border = if (colorSchemeType == "simple" || colorSchemeType == "minimal") {
-                        androidx.compose.foundation.BorderStroke(
-                            width = 1.dp,
-                            color = if (colorSchemeType == "simple") {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            }
-                        )
-                    } else {
-                        null
-                    }
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = "Reminder Notifications Disabled",
-                                fontWeight = FontWeight.Bold,
-                                color = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
-                        
-                        Text(
-                            text = if (!isNotificationPermissionGranted && !isAlarmPermissionGranted) {
-                                "Both Notification permission and Alarms & Reminders permission are required to trigger notifications for urgent scheduled tasks."
-                            } else if (!isNotificationPermissionGranted) {
-                                "Notification permission is required to trigger notifications for urgent scheduled tasks."
-                            } else {
-                                "Alarms & Reminders permission is required to schedule exact notifications for urgent tasks."
-                            },
-                            fontSize = AppFontSizes.small,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = AppFontSizes.medium
-                        )
-                        
-                        Button(
-                            onClick = {
-                                val intent = if (!isNotificationPermissionGranted) {
-                                    Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = android.net.Uri.fromParts("package", context.packageName, null)
-                                    }
-                                } else {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                            data = android.net.Uri.fromParts("package", context.packageName, null)
-                                        }
-                                    } else {
-                                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                            data = android.net.Uri.fromParts("package", context.packageName, null)
-                                        }
-                                    }
-                                }
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.align(Alignment.End),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (colorSchemeType == "simple") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-                                contentColor = if (colorSchemeType == "simple") MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onError
-                            )
-                        ) {
-                            Text("Grant Permission", fontSize = AppFontSizes.small, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
+                PermissionWarningCard(
+                    isAlarmPermissionGranted = isAlarmPermissionGranted,
+                    isNotificationPermissionGranted = isNotificationPermissionGranted,
+                    colorSchemeType = colorSchemeType,
+                    context = context
+                )
             }
 
             AnimatedVisibility(
@@ -337,289 +264,33 @@ fun HomeScreenContent(
             }
 
             // Smooth sliding horizontal pager
-            HorizontalPager(
-                state = pagerState,
+            HomeTasksPager(
+                pagerState = pagerState,
+                initialPage = initialPage,
+                baseDate = baseDate,
+                colorSchemeType = colorSchemeType,
+                sortOption = sortOption,
+                isStickyEnabled = isStickyEnabled,
+                onShowAddDialogChange = onShowAddDialogChange,
+                onTaskToEditChange = onTaskToEditChange,
+                onTaskToDeleteChange = onTaskToDeleteChange,
+                onToggleComplete = onToggleComplete,
+                onToggleSubComplete = onToggleSubComplete,
+                getTasksForDate = getTasksForDate,
+                onPreselectCategory = { cat -> preselectedCategory.value = cat },
                 modifier = Modifier.weight(1f)
-            ) { page ->
-                val pageDiff = page - initialPage
-                val pageDate = remember(page) {
-                    (baseDate.clone() as Calendar).apply {
-                        add(Calendar.DAY_OF_YEAR, pageDiff)
-                    }
-                }
-                val dateStr = remember(pageDate) { DateTimeUtils.formatDbDate(pageDate) }
-                val pageTasks by remember(dateStr) { getTasksForDate(dateStr) }
-                    .collectAsState(initial = emptyList())
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp)
-                ) {
-                    if (pageTasks.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = "No tasks",
-                                    modifier = Modifier
-                                        .size(82.dp)
-                                        .alpha(0.3f),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "No tasks recorded for today",
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
-                                Text(
-                                    text = "Swipe horizontally or tap Quick-Add to start!",
-                                    fontSize = AppFontSizes.small,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                )
-                            }
-                        }
-                    } else {
-                        val stickyTasks = remember(pageTasks, isStickyEnabled) {
-                            if (!isStickyEnabled) emptyList()
-                            else pageTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
-                        }
-                        val regularTasks = remember(pageTasks) {
-                            pageTasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
-                        }
-                        val groupedTasks = remember(regularTasks) {
-                            regularTasks.groupBy { it.category }
-                        }
-                        val collapsedCategories = remember { mutableStateMapOf<String, Boolean>() }
-                        val homeListItems = remember(groupedTasks, sortOption) {
-                            val items = mutableListOf<HomeListItem>()
-                            
-                            groupedTasks.filterKeys { it != null }.forEach { (cat, tasks) ->
-                                items.add(HomeListItem.CategoryGroup(cat!!, tasks))
-                            }
-                            
-                            val uncategorizedTasks = groupedTasks[null] ?: emptyList()
-                            uncategorizedTasks.forEach { task ->
-                                items.add(HomeListItem.TaglessTask(task))
-                            }
-                            
-                            if (sortOption == SortOption.PRIORITY) {
-                                items.sortedWith(
-                                    compareBy<HomeListItem> { item ->
-                                        when (item) {
-                                            is HomeListItem.CategoryGroup -> {
-                                                val pending = item.tasks.filter { !it.isCompleted }
-                                                pending.minOfOrNull { it.priority } ?: item.tasks.minOfOrNull { it.priority } ?: 4
-                                            }
-                                            is HomeListItem.TaglessTask -> {
-                                                if (item.task.isCompleted) 5 else item.task.priority
-                                            }
-                                        }
-                                    }.thenBy { item ->
-                                        when (item) {
-                                            is HomeListItem.CategoryGroup -> item.tasks.map { it.priority }.average()
-                                            is HomeListItem.TaglessTask -> item.task.priority.toDouble()
-                                        }
-                                    }.thenBy { item ->
-                                        when (item) {
-                                            is HomeListItem.CategoryGroup -> item.category
-                                            is HomeListItem.TaglessTask -> item.task.title
-                                        }
-                                    }
-                                )
-                            } else {
-                                val (categories, tagless) = items.partition { it is HomeListItem.CategoryGroup }
-                                val sortedCategories = categories.sortedBy { (it as HomeListItem.CategoryGroup).category }
-                                val sortedTagless = tagless.sortedBy { (it as HomeListItem.TaglessTask).task.createdSeq }
-                                sortedCategories + sortedTagless
-                            }
-                        }
-
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("home_tasks_list"),
-                            contentPadding = PaddingValues(bottom = 80.dp), // Clear bottom FAB space
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Top Sticky Section
-                            if (stickyTasks.isNotEmpty()) {
-                                item(key = "sticky_section") {
-                                    CategoryCard(
-                                        category = "Sticky",
-                                        tasks = stickyTasks,
-                                        isExpanded = true,
-                                        onToggleExpand = {},
-                                        onQuickAdd = {
-                                            preselectedCategory.value = "Sticky"
-                                            onShowAddDialogChange(true)
-                                        },
-                                        colorSchemeType = colorSchemeType
-                                    ) {
-                                        stickyTasks.forEachIndexed { index, task ->
-                                            TaskItemCard(
-                                                task = task,
-                                                colorSchemeType = colorSchemeType,
-                                                isFlat = true,
-                                                onToggleComplete = { onToggleComplete(task) },
-                                                onDelete = { onTaskToDeleteChange(task) },
-                                                onLongClick = { onTaskToEditChange(task) },
-                                                onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
-                                            )
-                                            if (index < stickyTasks.size - 1) {
-                                                HorizontalDivider(
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                                    thickness = 1.dp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                item(key = "sticky_divider") {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(vertical = 4.dp),
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                                        thickness = 2.dp
-                                    )
-                                }
-                            }
-                            items(homeListItems, key = { item ->
-                                when (item) {
-                                    is HomeListItem.CategoryGroup -> "category_card_${item.category}"
-                                    is HomeListItem.TaglessTask -> "task_${item.task.id}"
-                                }
-                            }) { item ->
-                                when (item) {
-                                    is HomeListItem.CategoryGroup -> {
-                                        val catName = item.category
-                                        val isCollapsed = collapsedCategories[catName] == true
-                                        CategoryCard(
-                                            category = catName,
-                                            tasks = item.tasks,
-                                            isExpanded = !isCollapsed,
-                                            onToggleExpand = {
-                                                collapsedCategories[catName] = !isCollapsed
-                                            },
-                                            onQuickAdd = {
-                                                preselectedCategory.value = catName
-                                                onShowAddDialogChange(true)
-                                            },
-                                            colorSchemeType = colorSchemeType
-                                        ) {
-                                            item.tasks.forEachIndexed { index, task ->
-                                                TaskItemCard(
-                                                    task = task,
-                                                    colorSchemeType = colorSchemeType,
-                                                    isFlat = true,
-                                                    onToggleComplete = { onToggleComplete(task) },
-                                                    onDelete = { onTaskToDeleteChange(task) },
-                                                    onLongClick = { onTaskToEditChange(task) },
-                                                    onToggleSubComplete = { subIdx -> onToggleSubComplete(task, subIdx) }
-                                                )
-                                                if (index < item.tasks.size - 1) {
-                                                    HorizontalDivider(
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                                        thickness = 1.dp
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                    is HomeListItem.TaglessTask -> {
-                                        TaskItemCard(
-                                            task = item.task,
-                                            colorSchemeType = colorSchemeType,
-                                            isFlat = false,
-                                            onToggleComplete = { onToggleComplete(item.task) },
-                                            onDelete = { onTaskToDeleteChange(item.task) },
-                                            onLongClick = { onTaskToEditChange(item.task) },
-                                            onToggleSubComplete = { subIdx -> onToggleSubComplete(item.task, subIdx) }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            )
         }
 
         // Floating Action Buttons (Add Task and optional Paste Task)
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            AnimatedVisibility(
-                visible = copiedTask != null && copiedTask.originalDateAdded != DateTimeUtils.formatDbDate(currentDate),
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it })
-            ) {
-                FloatingActionButton(
-                    onClick = {
-                        copiedTask?.let { copied ->
-                            val newReminderTime = copied.reminderTime?.let { origTime ->
-                                val origCal = Calendar.getInstance().apply { timeInMillis = origTime }
-                                val targetCal = Calendar.getInstance().apply {
-                                    time = currentDate.time
-                                    set(Calendar.HOUR_OF_DAY, origCal.get(Calendar.HOUR_OF_DAY))
-                                    set(Calendar.MINUTE, origCal.get(Calendar.MINUTE))
-                                    set(Calendar.SECOND, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                targetCal.timeInMillis
-                            }
-                             onAddTask(
-                                 copied.title,
-                                 copied.description,
-                                 copied.priority,
-                                 currentDate,
-                                 emptyList(),
-                                 0,
-                                 newReminderTime,
-                                 copied.repeatCount,
-                                 copied.subTasks,
-                                 copied.category,
-                                 copied.reminderType
-                             )
-                            Toast.makeText(context, "Task pasted!", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("paste_task_fab")
-                        .border(width = 1.dp, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), shape = CircleShape),
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp),
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentPaste,
-                        contentDescription = "Paste Task",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            FloatingActionButton(
-                onClick = { onShowAddDialogChange(true) },
-                modifier = Modifier.testTag("quick_add_fab"),
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Add Task")
-            }
-        }
+        HomeFABGroup(
+            copiedTask = copiedTask,
+            currentDate = currentDate,
+            context = context,
+            onShowAddDialogChange = onShowAddDialogChange,
+            onAddTask = onAddTask,
+            modifier = Modifier.align(Alignment.BottomEnd)
+        )
     }
 
     // Task Adding Overlay Dialog box configuration
@@ -680,37 +351,11 @@ fun HomeScreenContent(
 
     // Delete Task Confirmation Dialog
     if (taskToDelete != null) {
-         AlertDialog(
-            onDismissRequest = { onTaskToDeleteChange(null) },
-            modifier = Modifier.border(
-                width = 1.dp,
-                color = if (colorSchemeType == "simple") {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                } else if (colorSchemeType == "minimal") {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                } else {
-                    Color.Transparent
-                },
-                shape = RoundedCornerShape(28.dp)
-            ),
-            containerColor = MaterialTheme.colorScheme.dialogContainerColor,
-            title = { Text("Delete Task", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Are you sure you want to delete this task?", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        taskToDelete?.let { onDeleteTask(it) }
-                        onTaskToDeleteChange(null)
-                    }
-                ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onTaskToDeleteChange(null) }) {
-                    Text("Cancel", color = MaterialTheme.colorScheme.primary)
-                }
-            }
+        TaskDeleteDialog(
+            taskToDelete = taskToDelete,
+            colorSchemeType = colorSchemeType,
+            onDismiss = { onTaskToDeleteChange(null) },
+            onConfirmDelete = onDeleteTask
         )
     }
 }

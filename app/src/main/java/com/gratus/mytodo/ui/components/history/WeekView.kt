@@ -319,3 +319,20 @@ fun WeekView(
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "History Week View")
+@Composable
+fun WeekViewPreview() {
+    val sampleTasks = listOf(
+        Task(id = 1, title = "Task 1", description = "", priority = 1, dateAdded = "2026-08-13", isCompleted = true),
+        Task(id = 2, title = "Task 2", description = "", priority = 2, dateAdded = "2026-08-14")
+    )
+    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+        WeekView(
+            tasks = sampleTasks,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomLevelSet = {}
+        )
+    }
+}

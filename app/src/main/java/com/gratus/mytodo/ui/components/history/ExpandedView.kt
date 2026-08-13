@@ -432,3 +432,18 @@ fun ExpandedTaskRow(
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "History Expanded View")
+@Composable
+fun ExpandedViewPreview() {
+    val sampleTasks = listOf(
+        Task(id = 1, title = "Proposal Review", description = "Finalize details", priority = 1, dateAdded = "2026-08-13", isCompleted = true),
+        Task(id = 2, title = "Gym Workout", description = "Cardio session", priority = 2, dateAdded = "2026-08-13")
+    )
+    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+        ExpandedView(
+            tasks = sampleTasks,
+            colorSchemeType = "minimal"
+        )
+    }
+}

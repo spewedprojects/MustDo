@@ -110,7 +110,30 @@ fun StatsScreenContent(stats: StatsData) {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, showSystemUi = true, name = "Stats Screen - Navigable System UI")
+@Composable
+fun StatsScreenNavigablePreview() {
+    val sampleStats = StatsData(
+        totalTasks = 12,
+        completedTasks = 8,
+        completionRate = 67,
+        currentStreak = 4,
+        weeklyHistory = listOf(
+            DailyStats("Mon", 2, 3),
+            DailyStats("Tue", 1, 2),
+            DailyStats("Wed", 3, 3),
+            DailyStats("Thu", 0, 1),
+            DailyStats("Fri", 2, 4),
+            DailyStats("Sat", 5, 5),
+            DailyStats("Sun", 4, 6)
+        )
+    )
+    SoftTodoTheme {
+        StatsScreenContent(stats = sampleStats)
+    }
+}
+
+@Preview(showBackground = true, name = "Stats Screen - Portrait")
 @Composable
 fun StatsScreenPreview() {
     val sampleStats = StatsData(

@@ -109,3 +109,15 @@ fun CategoryChip(
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Category Chip - Selected")
+@Composable
+fun CategoryChipPreview() {
+    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+        CategoryChip(
+            category = "Work",
+            isSelected = true,
+            onSelect = {}
+        )
+    }
+}

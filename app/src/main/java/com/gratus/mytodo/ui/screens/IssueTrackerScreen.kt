@@ -353,7 +353,7 @@ private val previewIssues = listOf(
     )
 )
 
-@Preview(showBackground = true, name = "Issue Tracker Screen - Light Mode")
+@Preview(showBackground = true, showSystemUi = true, name = "Issue Tracker Screen - Navigable Light Mode")
 @Composable
 fun IssueTrackerScreenPreview() {
     SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
@@ -374,7 +374,7 @@ fun IssueTrackerScreenPreview() {
     }
 }
 
-@Preview(showBackground = true, name = "Issue Tracker Screen - Dark Mode")
+@Preview(showBackground = true, showSystemUi = true, name = "Issue Tracker Screen - Navigable Dark Mode")
 @Composable
 fun IssueTrackerScreenDarkPreview() {
     SoftTodoTheme(colorSchemeType = "minimal", themeMode = "dark") {

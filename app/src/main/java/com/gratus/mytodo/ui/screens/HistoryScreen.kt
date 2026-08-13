@@ -27,6 +27,9 @@ import com.gratus.mytodo.ui.components.history.ZoomableTaskRow
 
 import android.app.DatePickerDialog
 import androidx.compose.animation.*
+import androidx.compose.ui.tooling.preview.Preview
+import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,12 +58,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
-import com.gratus.mytodo.data.Task
 
 import com.gratus.mytodo.ui.FilterOption
 import com.gratus.mytodo.ui.MainViewModel
@@ -393,4 +394,28 @@ fun HistoryScreenContent(
         }
     }
 }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "History Screen - Navigable Light Mode")
+@Composable
+fun HistoryScreenNavigablePreview() {
+    val sampleTasks = listOf(
+        Task(id = 1, title = "Finish Proposal", description = "Finalize budget", priority = 1, dateAdded = "2026-08-10", isCompleted = true),
+        Task(id = 2, title = "Grocery Shopping", description = "Milk, Eggs, Bread", priority = 2, dateAdded = "2026-08-11", isCompleted = true),
+        Task(id = 3, title = "Gym Workout", description = "Leg day", priority = 3, dateAdded = "2026-08-12", isCompleted = false)
+    )
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = sampleTasks,
+            query = "",
+            zoomLevel = 3,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = {}
+        )
+    }
 }

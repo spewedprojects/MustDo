@@ -39,7 +39,15 @@ app/src/main/
 │   │   │   │   ├── AlarmScreenContent.kt     # Full-screen critical task alarm overlay layout and previews
 │   │   │   │   └── SnoozeDialogContent.kt    # Dialog composable for preset & custom snooze selection
 │   │   │   ├── dialogs/
-│   │   │   │   └── CategoryChip.kt           # Visual category chip selector and getCategoryIcon helper
+│   │   │   │   ├── AddCustomCategoryDialog.kt # Custom category creation AlertDialog
+│   │   │   │   ├── CategoryChip.kt           # Visual category chip selector and getCategoryIcon helper
+│   │   │   │   ├── CustomDateRangePickerDialog.kt # DateRangePicker modal container
+│   │   │   │   ├── MultiDayReplicationSection.kt # Preset chips & formatDateRangeChipText date range chip
+│   │   │   │   ├── SubTaskSection.kt         # Expandable sub-task list, reordering & inline input
+│   │   │   │   ├── TaskDescriptionInput.kt   # Description text field & formatting toolbar
+│   │   │   │   ├── TaskDialogPickers.kt      # Category & date range picker dialogs
+│   │   │   │   ├── TaskPriorityCategoryRow.kt# Priority & Category selector dropdowns
+│   │   │   │   └── TaskReminderSection.kt    # Alarm reminder scheduler & notification type selector
 │   │   │   ├── history/
 │   │   │   │   ├── ExpandedView.kt           # Level 3 expanded detail view and task rows
 │   │   │   │   ├── MainFontText.kt           # Custom styled text wrapper for history timelines
@@ -49,6 +57,11 @@ app/src/main/
 │   │   │   │   └── ZoomableTaskRow.kt        # Multi-level zoomable row dispatcher component
 │   │   │   ├── home/
 │   │   │   │   ├── CategoryCard.kt           # Category container card and getCategoryAccentColor helper
+│   │   │   │   ├── EmptyTasksState.kt        # Empty list state illustration composable
+│   │   │   │   ├── HomeFABGroup.kt           # Floating action buttons (Paste FAB + QuickAdd FAB)
+│   │   │   │   ├── HomeTasksPager.kt         # Sliding horizontal pager displaying daily task cards and categories
+│   │   │   │   ├── PermissionWarningCard.kt  # Permission warning alert banner
+│   │   │   │   ├── TaskDeleteDialog.kt       # Task deletion confirmation AlertDialog
 │   │   │   │   ├── TaskItemCard.kt           # Task item card composable with priority badges & previews
 │   │   │   │   └── TaskItemHelpers.kt        # borderStrokeSimple and getPriorityBoxColor helpers
 │   │   │   ├── issue/
@@ -58,6 +71,12 @@ app/src/main/
 │   │   │   ├── navigation/
 │   │   │   │   ├── AppDrawerContent.kt       # Navigation drawer sheet layout and GitHub link
 │   │   │   │   └── MainLayoutContent.kt      # Main scaffold layout with TopAppBar and drawer container
+│   │   │   ├── settings/
+│   │   │   │   ├── AestheticsSettingsCard.kt # Theme mode & color scheme selection card
+│   │   │   │   ├── BackupsRestorationsCard.kt# Device export and backup restoration action button card
+│   │   │   │   ├── FeaturePreferencesCard.kt # Sticky Tasks feature toggle card
+│   │   │   │   ├── ReminderSettingsCard.kt   # Permissions status, repeat interval, and ringtone selector card
+│   │   │   │   └── SettingsBackupUtils.kt    # MediaStore document saver and ringtone title resolver
 │   │   │   └── stats/
 │   │   │       ├── CompletionRateCard.kt     # Circular canvas progress card for completion rate
 │   │   │       ├── ConsistencyCard.kt        # Streak count card with flame graphics

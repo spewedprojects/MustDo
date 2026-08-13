@@ -29,6 +29,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -91,6 +92,7 @@ class AlarmActivity : ComponentActivity() {
         val themeMode = sharedPrefs.getString("theme", "auto") ?: "auto"
         val colorSchemeType = sharedPrefs.getString("color_scheme", "minimal") ?: "minimal"
 
+        enableEdgeToEdge()
         setContent {
             SoftTodoTheme(
                 themeMode = themeMode,
