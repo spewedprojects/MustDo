@@ -97,7 +97,7 @@ fun FeaturePreferencesCard(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Enable and sticky tasks. Disabling hides all sticky features without altering database records.",
+                            text = "Enable sticky tasks. Disabling hides all sticky features without altering database records.",
                             fontSize = AppFontSizes.small,
                             lineHeight = 18.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)

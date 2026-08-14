@@ -32,12 +32,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.Locale as LocalLocale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.ui.components.dialogs.getCategoryIcon
-import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
+//import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
 import com.gratus.mytodo.ui.components.home.getPriorityBoxColor
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
+import com.gratus.mytodo.ui.theme.getCategoryAccentColor
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -56,6 +59,7 @@ fun WeekView(
     onZoomLevelSet: (Int) -> Unit,
     onNavigateToHomeDate: ((Calendar) -> Unit)? = null
 ) {
+    val isDark = MaterialTheme.colorScheme.background.red < 0.2f // The line is a heuristic (a "quick rule of thumb") used to detect if the current app theme is in "Dark Mode" based on the actual color of the background. Alternatively, '.background.luminance()' < 0.5f can also be used.
     val groupedByWeek = remember(tasks) {
         tasks.groupBy { task ->
             val date = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
@@ -283,7 +287,7 @@ fun WeekView(
                                                                 Icon(
                                                                     imageVector = getCategoryIcon(task.category),
                                                                     contentDescription = task.category,
-                                                                    tint = getCategoryAccentColor(task.category),
+                                                                    tint = getCategoryAccentColor(task.category, colorSchemeType, isDark),
                                                                     modifier = Modifier.size(10.dp)
                                                                 )
                                                             }
@@ -320,14 +324,14 @@ fun WeekView(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "History Week View")
+@Preview(showBackground = true, name = "History Week View")
 @Composable
 fun WeekViewPreview() {
     val sampleTasks = listOf(
         Task(id = 1, title = "Task 1", description = "", priority = 1, dateAdded = "2026-08-13", isCompleted = true),
         Task(id = 2, title = "Task 2", description = "", priority = 2, dateAdded = "2026-08-14")
     )
-    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+    SoftTodoTheme {
         WeekView(
             tasks = sampleTasks,
             colorSchemeType = "minimal",

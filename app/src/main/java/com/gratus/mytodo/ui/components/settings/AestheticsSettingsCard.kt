@@ -18,6 +18,7 @@
 
 package com.gratus.mytodo.ui.components.settings
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,9 +61,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.gratus.mytodo.R
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import kotlin.text.format
 
 /**
@@ -69,6 +77,8 @@ import kotlin.text.format
  */
 @Composable
 fun AestheticsSettingsCard(
+    modifier: Modifier = Modifier,
+    customizerExpanded: Boolean = false,
     activeTheme: String,
     activeScheme: String,
     colorfulHueShift: Float,
@@ -76,8 +86,7 @@ fun AestheticsSettingsCard(
     onThemeChange: (String) -> Unit,
     onSchemeChange: (String) -> Unit,
     onHueShiftChange: (Float) -> Unit,
-    onSatScaleChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    onSatScaleChange: (Float) -> Unit
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -149,105 +158,103 @@ fun AestheticsSettingsCard(
                     Triple("minimal", "Clean Minimalism", "Lavender backing with space-blurry spheres, sleek borders, and elegant state indicators."),
                     Triple("simple", "Simple B&W Only", "Black and white base, accents colored strictly around Priority levels."),
                     Triple("colorful", "Pastel Colorful", "Soft pastel layers with faint radial sweeping neon screen background."),
-                    Triple("system", "System Monet", "Dynamic native Material You colors synched directly from Android 12+ wallpaper settings.")
+                    Triple("system", "System Monet", "Dynamic native Material You colors synced directly from Android 12+ wallpaper settings.")
                 )
 
                 schemes.forEach { (schemeKey, name, desc) ->
                     val isSelected = activeScheme == schemeKey
                     var customizerExpanded by remember { mutableStateOf(false) }
 
-                    Column {
-                        Box(
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                            )
+                            .border(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.secondary
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable { onSchemeChange(schemeKey) }
+                            .animateContentSize()
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.secondary
-                                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable { onSchemeChange(schemeKey) }
-                                .padding(14.dp)
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.Top
+                                Icon(
+                                    imageVector = when (schemeKey) {
+                                        "minimal" -> Icons.Default.Spa
+                                        "simple" -> Icons.Default.BrightnessLow
+                                        "colorful" -> Icons.Default.Palette
+                                        else -> Icons.Default.SettingsSuggest
+                                    },
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(18.dp).offset(x = 0.dp, y = 3.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = AppFontSizes.large,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = desc,
+                                        fontSize = AppFontSizes.small,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        lineHeight = AppFontSizes.medium
+                                    )
+                                }
+                            }
+
+                            if (schemeKey == "colorful") {
+                                IconButton(
+                                    onClick = {
+                                        onSchemeChange(schemeKey)
+                                        customizerExpanded = !customizerExpanded
+                                    },
+                                    modifier = Modifier.size(32.dp)
                                 ) {
+                                    val DiscoverTune = ImageVector.vectorResource(R.drawable.discover_tune_18dp)
                                     Icon(
-                                        imageVector = when (schemeKey) {
-                                            "minimal"  -> Icons.Default.Spa
-                                            "simple"   -> Icons.Default.BrightnessLow
-                                            "colorful" -> Icons.Default.Palette
-                                            else       -> Icons.Default.SettingsSuggest
-                                        },
-                                        contentDescription = null,
-                                        tint = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline,
+                                        imageVector = DiscoverTune,
+                                        contentDescription = "Customize colorful palette",
+                                        tint = if (isSelected) MaterialTheme.colorScheme.secondary
+                                        else MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Column {
-                                        Text(
-                                            text = name,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = AppFontSizes.large,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = desc,
-                                            fontSize = AppFontSizes.small,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                            lineHeight = AppFontSizes.medium
-                                        )
-                                    }
                                 }
-
-                                if (schemeKey == "colorful") {
-                                    IconButton(
-                                        onClick = {
-                                            onSchemeChange(schemeKey)
-                                            customizerExpanded = !customizerExpanded
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Tune,
-                                            contentDescription = "Customize colorful palette",
-                                            tint = if (isSelected) MaterialTheme.colorScheme.secondary
-                                                   else MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { onSchemeChange(schemeKey) },
-                                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
-                                )
                             }
+
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { onSchemeChange(schemeKey) },
+                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.secondary)
+                            )
                         }
 
-                        if (schemeKey == "colorful" && customizerExpanded) {
+                        if (schemeKey == "colorful" && isSelected && customizerExpanded) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 14.dp),
+                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)
+                            )
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f))
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                                        RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp)
-                                    )
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
@@ -291,7 +298,7 @@ fun AestheticsSettingsCard(
                                         )
                                         Text(
                                             text = if (colorfulHueShift == 0f) "Default"
-                                                   else "%+.0f°".format(colorfulHueShift),
+                                            else "%+.0f°".format(colorfulHueShift),
                                             fontSize = AppFontSizes.small,
                                             color = MaterialTheme.colorScheme.secondary
                                         )
@@ -321,7 +328,7 @@ fun AestheticsSettingsCard(
                                         )
                                         Text(
                                             text = if (colorfulSatScale == 1f) "Default"
-                                                   else "%.2f×".format(colorfulSatScale),
+                                            else "%.2f×".format(colorfulSatScale),
                                             fontSize = AppFontSizes.small,
                                             color = MaterialTheme.colorScheme.secondary
                                         )
@@ -362,5 +369,42 @@ fun AestheticsSettingsCard(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true, name = "Aesthetics Settings Card - Minimal Light")
+@Composable
+fun AestheticsSettingsCardLightPreview() {
+    SoftTodoTheme(themeMode = "light", colorSchemeType = "minimal") {
+        AestheticsSettingsCard(
+            activeTheme = "light",
+            activeScheme = "minimal",
+            colorfulHueShift = 0f,
+            colorfulSatScale = 1f,
+            onThemeChange = {},
+            onSchemeChange = {},
+            onHueShiftChange = {},
+            onSatScaleChange = {},
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Aesthetics Settings Card - Colorful Dark")
+@Composable
+fun AestheticsSettingsCardDarkPreview() {
+    SoftTodoTheme(themeMode = "dark", colorSchemeType = "colorful") {
+        AestheticsSettingsCard(
+            activeTheme = "dark",
+            customizerExpanded = true,
+            activeScheme = "colorful",
+            colorfulHueShift = 10f,
+            colorfulSatScale = 1.1f,
+            onThemeChange = {},
+            onSchemeChange = {},
+            onHueShiftChange = {},
+            onSatScaleChange = {},
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }

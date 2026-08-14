@@ -71,7 +71,7 @@ import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.text.SimpleDateFormat
 import java.util.*
 import com.gratus.mytodo.ui.components.dialogs.getCategoryIcon
-import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
+//import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
 import androidx.compose.ui.platform.LocalLocale
 
 /**

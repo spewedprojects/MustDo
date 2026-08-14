@@ -31,27 +31,30 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.ui.components.dialogs.getCategoryIcon
 import com.gratus.mytodo.ui.theme.MinimalDarkCardBorder
 import com.gratus.mytodo.ui.theme.MinimalLightCardBorder
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
+import com.gratus.mytodo.ui.theme.getCategoryAccentColor
 
 /**
  * Resolves color coding accents matching default and custom category titles.
  */
-fun getCategoryAccentColor(category: String): Color {
-    val lower = category.lowercase().trim()
-    return when {
-        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
-        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
-        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
-        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Color(0xFF9C27B0) // Purple
-        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Color(0xFFFF5722) // Orange
-        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Color(0xFFFFC107) // Amber/Yellow
-        else -> Color(0xFF673AB7) // Indigo/default
-    }
-}
+//fun getCategoryAccentColor(category: String): Color {
+//    val lower = category.lowercase().trim()
+//    return when {
+//        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
+//        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
+//        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
+//        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Color(0xFF9C27B0) // Purple
+//        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Color(0xFFFF5722) // Orange
+//        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Color(0xFFFFC107) // Amber/Yellow
+//        else -> Color(0xFF673AB7) // Indigo/default
+//    }
+//}
 
 /**
  * Category group header card component.
@@ -67,7 +70,7 @@ fun CategoryCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
-    val accentColor = getCategoryAccentColor(category)
+    val accentColor = getCategoryAccentColor(category, colorSchemeType, isDark)
     val icon = getCategoryIcon(category)
 
     Card(
@@ -171,10 +174,10 @@ fun CategoryCard(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Category Card")
+@Preview(showBackground = false, name = "Category Card")
 @Composable
 fun CategoryCardPreview() {
-    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+    SoftTodoTheme (colorSchemeType = "simple"){
         CategoryCard(
             category = "Work",
             tasks = listOf(
@@ -183,7 +186,7 @@ fun CategoryCardPreview() {
             isExpanded = true,
             onToggleExpand = {},
             onQuickAdd = {},
-            colorSchemeType = "minimal"
+            colorSchemeType = "simple"
         ) {
             Text("Category Task Content", modifier = Modifier.padding(16.dp))
         }

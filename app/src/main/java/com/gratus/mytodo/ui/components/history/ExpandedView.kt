@@ -1,5 +1,6 @@
 package com.gratus.mytodo.ui.components.history
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,13 +40,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.ui.components.dialogs.getCategoryIcon
-import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
+//import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
 import com.gratus.mytodo.ui.components.home.getPriorityBoxColor
 import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.MinimalDarkCardBorder
 import com.gratus.mytodo.ui.theme.MinimalLightCardBorder
 import com.gratus.mytodo.ui.theme.PriorityThemeBadgeColors
+import com.gratus.mytodo.ui.theme.getCategoryAccentColor
 import com.gratus.mytodo.ui.theme.getMinimalPriorityColors
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import java.util.Calendar
@@ -82,10 +84,10 @@ fun ExpandedView(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
                     border = when (colorSchemeType) {
-                        "simple" -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
+                        "simple" -> BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f))
                         "minimal" -> {
                             val isDark = MaterialTheme.colorScheme.background.red < 0.2f
-                            androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
+                            BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
                         }
                         else -> null
                     }
@@ -244,9 +246,9 @@ fun ExpandedTaskRow(
         ),
         border = if (colorSchemeType == "minimal") {
             if (isCompleted) {
-                androidx.compose.foundation.BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
+                BorderStroke(1.dp, if (isDark) Color(0x11FFFFFF) else Color(0x33E2E8F0))
             } else {
-                androidx.compose.foundation.BorderStroke(1.dp, if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder)
+                BorderStroke(1.dp, if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder)
             }
         } else {
             null
@@ -294,14 +296,14 @@ fun ExpandedTaskRow(
                             Icon(
                                 imageVector = getCategoryIcon(task.category),
                                 contentDescription = task.category,
-                                tint = getCategoryAccentColor(task.category),
+                                tint = getCategoryAccentColor(task.category, colorSchemeType, isDark),
                                 modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = task.category.uppercase(),
                                 fontSize = AppFontSizes.nano,
                                 fontWeight = FontWeight.Bold,
-                                color = getCategoryAccentColor(task.category)
+                                color = getCategoryAccentColor(task.category, colorSchemeType, isDark)
                             )
                         }
                     }
