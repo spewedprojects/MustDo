@@ -24,6 +24,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,6 +64,7 @@ import com.gratus.mytodo.ui.theme.SoftTodoTheme
 @Composable
 fun ReminderSettingsCard(
     isAlarmPermissionGranted: Boolean,
+    colorSchemeType: String,
     isNotificationPermissionGranted: Boolean,
     activeInterval: Int,
     ringtoneUri: String?,
@@ -75,7 +77,15 @@ fun ReminderSettingsCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = when (colorSchemeType) {
+            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            )
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+        },
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -371,6 +381,7 @@ fun ReminderSettingsCardPermissionsGrantedPreview() {
     SoftTodoTheme {
         ReminderSettingsCard(
             isAlarmPermissionGranted = true,
+            colorSchemeType = "simple",
             isNotificationPermissionGranted = true,
             activeInterval = 15,
             ringtoneUri = null,
@@ -388,6 +399,7 @@ fun ReminderSettingsCardPermissionsDeniedPreview() {
     SoftTodoTheme {
         ReminderSettingsCard(
             isAlarmPermissionGranted = false,
+            colorSchemeType = "simple",
             isNotificationPermissionGranted = false,
             activeInterval = 5,
             ringtoneUri = null,

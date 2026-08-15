@@ -264,6 +264,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _taskToDelete.value = task
     }
 
+    private val _highlightedTaskId = MutableStateFlow<Int?>(null)
+    val highlightedTaskId: StateFlow<Int?> = _highlightedTaskId.asStateFlow()
+
+    private var highlightJob: kotlinx.coroutines.Job? = null
+
+    fun setHighlightedTaskId(id: Int?) {
+        highlightJob?.cancel()
+        _highlightedTaskId.value = id
+        if (id != null) {
+            highlightJob = viewModelScope.launch {
+                kotlinx.coroutines.delay(2000)
+                if (_highlightedTaskId.value == id) {
+                    _highlightedTaskId.value = null
+                }
+            }
+        }
+    }
+
     // Historical screen states
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -345,25 +363,64 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val directTasksForDate = allTasks.filter { it.dateAdded == dateStr }
-                val stickyMasters = allTasks
+                val stickyGroups = allTasks
                     .filter { it.category?.equals("Sticky", ignoreCase = true) == true }
                     .groupBy { it.title.trim().lowercase(java.util.Locale.ROOT) }
-                    .mapValues { (_, instances) -> instances.minByOrNull { it.dateAdded }!! }
-                    .values
-                    .filter { master ->
-                        master.dateAdded <= dateStr &&
-                        (!master.isCompleted || master.dateAdded == dateStr) &&
-                        (master.deadlineDate.isNullOrBlank() || dateStr <= master.deadlineDate)
-                    }
 
                 val combined = directTasksForDate.toMutableList()
-                stickyMasters.forEach { master ->
+
+                stickyGroups.forEach { (_, instances) ->
+                    val master = instances.minByOrNull { it.dateAdded } ?: return@forEach
+                    val isEveryday = master.deadlineDate.isNullOrBlank()
+                    val deadlineDate = master.deadlineDate
+                    val terminatedDate = master.terminatedDate
+
+                    // Sticky task only starts on or after master's dateAdded
+                    if (dateStr < master.dateAdded) return@forEach
+
+                    // If task was terminated, cannot appear after terminatedDate
+                    if (!terminatedDate.isNullOrBlank() && dateStr > terminatedDate) return@forEach
+
+                    // If deadline task, cannot appear after deadlineDate
+                    if (!isEveryday && deadlineDate != null && dateStr > deadlineDate) return@forEach
+
+                    // Check if already present in direct tasks for this date
                     val alreadyHasDirect = directTasksForDate.any {
                         it.category?.equals("Sticky", ignoreCase = true) == true &&
-                        it.title.equals(master.title, ignoreCase = true)
+                        it.title.trim().equals(master.title.trim(), ignoreCase = true)
                     }
+
                     if (!alreadyHasDirect) {
-                        combined.add(master.copy(dateAdded = dateStr, id = 0))
+                        if (isEveryday) {
+                            // Everyday task: Always generates a fresh, uncompleted virtual task for dateStr
+                            combined.add(
+                                master.copy(
+                                    id = 0,
+                                    dateAdded = dateStr,
+                                    isCompleted = false,
+                                    repeatedTimes = 0,
+                                    subTasks = master.subTasks.map { it.copy(isCompleted = false) },
+                                    snoozedUntil = null,
+                                    nextReminderTime = master.reminderTime
+                                )
+                            )
+                        } else {
+                            // Deadline task: If completed on any prior day (< dateStr), stops repeating on future days
+                            val completedPrior = instances.any { it.dateAdded < dateStr && it.isCompleted }
+                            if (!completedPrior) {
+                                combined.add(
+                                    master.copy(
+                                        id = 0,
+                                        dateAdded = dateStr,
+                                        isCompleted = false,
+                                        repeatedTimes = 0,
+                                        subTasks = master.subTasks.map { it.copy(isCompleted = false) },
+                                        snoozedUntil = null,
+                                        nextReminderTime = master.reminderTime
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
                 combined
@@ -570,9 +627,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 it.title.trim().equals(targetTitle, ignoreCase = true)
             }
 
-            // Mark all past/current instances (including master task) as completed and disable reminders
+            // Set terminatedDate to currentDateAdded on master and historical instances, mark completed
             matchingSticky.filter { it.dateAdded <= currentDateAdded }.forEach { t ->
-                val updated = t.copy(isCompleted = true, isReminderActive = false, snoozedUntil = null)
+                val updated = t.copy(
+                    isCompleted = true,
+                    isReminderActive = false,
+                    snoozedUntil = null,
+                    terminatedDate = currentDateAdded
+                )
                 repository.updateTask(updated)
                 NotificationReceiver.cancelReminder(getApplication(), t)
             }
@@ -590,7 +652,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val terminatedInstance = task.copy(
                         isCompleted = true,
                         isReminderActive = false,
-                        snoozedUntil = null
+                        snoozedUntil = null,
+                        terminatedDate = currentDateAdded
                     )
                     repository.insertTask(terminatedInstance)
                 }
@@ -708,13 +771,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isCompleted = isMainCompleted,
                 snoozedUntil = if (isMainCompleted) null else task.snoozedUntil
             )
-            repository.updateTask(updatedTask)
-            
-            // Handle reminders sync if status changed
-            if (updatedTask.isCompleted) {
-                cancelReminder(updatedTask)
-            } else if (updatedTask.reminderTime != null && updatedTask.reminderTime > System.currentTimeMillis()) {
-                scheduleExactReminder(updatedTask)
+            if (task.id == 0) {
+                val newId = repository.insertTask(updatedTask).toInt()
+                val insertedTask = updatedTask.copy(id = newId)
+                if (insertedTask.isCompleted) {
+                    cancelReminder(insertedTask)
+                } else if (insertedTask.reminderTime != null && insertedTask.reminderTime > System.currentTimeMillis()) {
+                    scheduleExactReminder(insertedTask)
+                }
+            } else {
+                repository.updateTask(updatedTask)
+                if (updatedTask.isCompleted) {
+                    cancelReminder(updatedTask)
+                } else if (updatedTask.reminderTime != null && updatedTask.reminderTime > System.currentTimeMillis()) {
+                    scheduleExactReminder(updatedTask)
+                }
             }
 
             updateWidget()

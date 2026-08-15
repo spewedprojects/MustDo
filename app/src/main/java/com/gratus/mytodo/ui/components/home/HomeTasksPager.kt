@@ -32,6 +32,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -62,6 +63,7 @@ fun HomeTasksPager(
     colorSchemeType: String,
     sortOption: SortOption,
     isStickyEnabled: Boolean,
+    highlightedTaskId: Int? = null,
     onShowAddDialogChange: (Boolean) -> Unit,
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -104,6 +106,19 @@ fun HomeTasksPager(
                     regularTasks.groupBy { it.category }
                 }
                 val collapsedCategories = remember { mutableStateMapOf<String, Boolean>() }
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+
+                // Auto-expand category containing highlighted task
+                androidx.compose.runtime.LaunchedEffect(highlightedTaskId, groupedTasks) {
+                    if (highlightedTaskId != null) {
+                        groupedTasks.forEach { (cat, tasks) ->
+                            if (cat != null && tasks.any { it.id == highlightedTaskId }) {
+                                collapsedCategories[cat] = false
+                            }
+                        }
+                    }
+                }
+
                 val homeListItems = remember(groupedTasks, sortOption) {
                     val items = mutableListOf<HomeListItem>()
                     
@@ -148,7 +163,29 @@ fun HomeTasksPager(
                     }
                 }
 
+                // Scroll to highlighted task item
+                LaunchedEffect(highlightedTaskId, homeListItems, stickyTasks) {
+                    if (highlightedTaskId != null) {
+                        val stickyIdx = stickyTasks.indexOfFirst { it.id == highlightedTaskId }
+                        if (stickyIdx >= 0) {
+                            listState.animateScrollToItem(0)
+                        } else {
+                            val itemIdx = homeListItems.indexOfFirst { item ->
+                                when (item) {
+                                    is HomeListItem.CategoryGroup -> item.tasks.any { it.id == highlightedTaskId }
+                                    is HomeListItem.TaglessTask -> item.task.id == highlightedTaskId
+                                }
+                            }
+                            if (itemIdx >= 0) {
+                                val offset = if (stickyTasks.isNotEmpty()) 2 else 0
+                                listState.animateScrollToItem(itemIdx + offset)
+                            }
+                        }
+                    }
+                }
+
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("home_tasks_list"),
@@ -174,6 +211,7 @@ fun HomeTasksPager(
                                         task = task,
                                         colorSchemeType = colorSchemeType,
                                         isFlat = true,
+                                        isHighlighted = task.id == highlightedTaskId,
                                         onToggleComplete = { onToggleComplete(task) },
                                         onDelete = { onTaskToDeleteChange(task) },
                                         onLongClick = { onTaskToEditChange(task) },
@@ -224,6 +262,7 @@ fun HomeTasksPager(
                                             task = task,
                                             colorSchemeType = colorSchemeType,
                                             isFlat = true,
+                                            isHighlighted = task.id == highlightedTaskId,
                                             onToggleComplete = { onToggleComplete(task) },
                                             onDelete = { onTaskToDeleteChange(task) },
                                             onLongClick = { onTaskToEditChange(task) },
@@ -243,6 +282,7 @@ fun HomeTasksPager(
                                     task = item.task,
                                     colorSchemeType = colorSchemeType,
                                     isFlat = false,
+                                    isHighlighted = item.task.id == highlightedTaskId,
                                     onToggleComplete = { onToggleComplete(item.task) },
                                     onDelete = { onTaskToDeleteChange(item.task) },
                                     onLongClick = { onTaskToEditChange(item.task) },

@@ -126,6 +126,7 @@ fun HomeScreen(
     val customCategories by viewModel.customCategories.collectAsState()
 
     val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
+    val highlightedTaskId by viewModel.highlightedTaskId.collectAsState()
 
     HomeScreenContent(
         currentDate = currentDate,
@@ -141,6 +142,7 @@ fun HomeScreen(
         customCategories = customCategories,
         sortOption = sortOption,
         isStickyEnabled = isStickyEnabled,
+        highlightedTaskId = highlightedTaskId,
         onShowAddDialogChange = { viewModel.setShowAddDialog(it) },
         onTaskToEditChange = { viewModel.setTaskToEdit(it) },
         onTaskToDeleteChange = { viewModel.setTaskToDelete(it) },
@@ -184,6 +186,7 @@ fun HomeScreenContent(
     customCategories: List<String>,
     sortOption: SortOption = SortOption.PRIORITY,
     isStickyEnabled: Boolean = true,
+    highlightedTaskId: Int? = null,
     onShowAddDialogChange: (Boolean) -> Unit = {},
     onTaskToEditChange: (Task?) -> Unit,
     onTaskToDeleteChange: (Task?) -> Unit,
@@ -206,31 +209,40 @@ fun HomeScreenContent(
     val context = LocalContext.current
     val preselectedCategory = remember { mutableStateOf<String?>(null) }
 
-    // Smooth Sliding Pager setup
+    // Smooth Sliding Pager setup initialized at current date's offset
     val baseDate = remember { Calendar.getInstance() }
     val initialPage = 10000
-    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { 20000 })
+    val initialPageOffset = remember {
+        DateTimeUtils.daysBetween(baseDate, currentDate)
+    }
+    val pagerState = rememberPagerState(initialPage = initialPage + initialPageOffset, pageCount = { 20000 })
 
     val daysDiff = remember(currentDate) {
         DateTimeUtils.daysBetween(baseDate, currentDate)
     }
     val targetPage = initialPage + daysDiff
 
-    // Scroll to page when currentDate changes externally (arrows, picker)
+    // Scroll to page when currentDate changes externally (arrows, picker, history navigation)
     LaunchedEffect(targetPage) {
         if (pagerState.currentPage != targetPage) {
-            pagerState.animateScrollToPage(targetPage)
+            if (kotlin.math.abs(pagerState.currentPage - targetPage) > 1) {
+                pagerState.scrollToPage(targetPage)
+            } else {
+                pagerState.animateScrollToPage(targetPage)
+            }
         }
     }
 
-    // Sync focus date when page changes via swipe gesture
-    LaunchedEffect(pagerState.currentPage) {
-        val diff = pagerState.currentPage - initialPage
-        val targetCal = (baseDate.clone() as Calendar).apply {
-            add(Calendar.DAY_OF_YEAR, diff)
-        }
-        if (!DateTimeUtils.isSameDay(targetCal, currentDate)) {
-            onSetDate(targetCal)
+    // Sync focus date when page changes via swipe gesture (guarded against in-progress scrolls)
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress) {
+            val diff = pagerState.currentPage - initialPage
+            val targetCal = (baseDate.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, diff)
+            }
+            if (!DateTimeUtils.isSameDay(targetCal, currentDate)) {
+                onSetDate(targetCal)
+            }
         }
     }
 
@@ -275,6 +287,7 @@ fun HomeScreenContent(
                 colorSchemeType = colorSchemeType,
                 sortOption = sortOption,
                 isStickyEnabled = isStickyEnabled,
+                highlightedTaskId = highlightedTaskId,
                 onShowAddDialogChange = onShowAddDialogChange,
                 onTaskToEditChange = onTaskToEditChange,
                 onTaskToDeleteChange = onTaskToDeleteChange,

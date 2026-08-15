@@ -18,6 +18,7 @@
 
 package com.gratus.mytodo.ui.components.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,13 +54,22 @@ import com.gratus.mytodo.ui.theme.SoftTodoTheme
 @Composable
 fun FeaturePreferencesCard(
     isStickyEnabled: Boolean,
+    colorSchemeType: String,
     onStickyEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = when (colorSchemeType) {
+            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            )
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+        }
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -120,6 +130,7 @@ fun FeaturePreferencesCardEnabledPreview() {
     SoftTodoTheme {
         FeaturePreferencesCard(
             isStickyEnabled = true,
+            colorSchemeType = "simple",
             onStickyEnabledChange = {},
             modifier = Modifier.padding(16.dp)
         )
@@ -132,6 +143,7 @@ fun FeaturePreferencesCardDisabledPreview() {
     SoftTodoTheme {
         FeaturePreferencesCard(
             isStickyEnabled = false,
+            colorSchemeType = "simple",
             onStickyEnabledChange = {},
             modifier = Modifier.padding(16.dp)
         )

@@ -49,7 +49,8 @@ fun MonthView(
     tasks: List<Task>,
     stickyTasks: List<Task> = emptyList(),
     colorSchemeType: String,
-    onZoomLevelSet: (Int) -> Unit
+    onZoomLevelSet: (Int) -> Unit,
+    onNavigateToHomeDate: ((Calendar, Int?) -> Unit)? = null
 ) {
     val groupedByMonth = remember(tasks) {
         tasks.groupBy { task ->
@@ -88,6 +89,14 @@ fun MonthView(
                     ) {
                         val activeStickyInMonth = remember(stickyTasks, monthStr) {
                             stickyTasks.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        }
+                        val monthCal = remember(monthTasks) {
+                            val firstTask = monthTasks.firstOrNull()
+                            val date = if (firstTask != null) DateTimeUtils.parseDbDate(firstTask.dateAdded) ?: Date() else Date()
+                            Calendar.getInstance().apply {
+                                time = date
+                                set(Calendar.DAY_OF_MONTH, 1)
+                            }
                         }
 
                         Row(
@@ -139,6 +148,13 @@ fun MonthView(
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f))
+                                            .then(
+                                                if (onNavigateToHomeDate != null) {
+                                                    Modifier.clickable {
+                                                        onNavigateToHomeDate(monthCal, stickyTask.id)
+                                                    }
+                                                } else Modifier
+                                            )
                                             .padding(horizontal = 10.dp, vertical = 6.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically

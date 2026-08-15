@@ -99,12 +99,30 @@ class TodayAppWidgetProvider : AppWidgetProvider() {
             
         } else if (action == ACTION_TOGGLE_COMPLETE) {
             val taskId = intent.getIntExtra("task_id", -1)
-            if (taskId != -1) {
+            val taskTitle = intent.getStringExtra("task_title")
+            val isSticky = intent.getBooleanExtra("is_sticky", false)
+            if (taskId != -1 || (!taskTitle.isNullOrBlank() && isSticky)) {
                 val pendingResult = goAsync()
                 val db = TaskDatabase.getDatabase(context)
+                val dateStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
-                        val task = db.taskDao().getTaskById(taskId)
+                        val task = if (taskId > 0) {
+                            db.taskDao().getTaskById(taskId)
+                        } else {
+                            val direct = db.taskDao().getTasksForDateDirect(dateStr).find {
+                                it.category?.equals("Sticky", ignoreCase = true) == true &&
+                                it.title.trim().equals(taskTitle?.trim(), ignoreCase = true)
+                            }
+                            if (direct != null) direct else {
+                                val master = db.taskDao().getAllTasksDirect().find {
+                                    it.category?.equals("Sticky", ignoreCase = true) == true &&
+                                    it.title.trim().equals(taskTitle?.trim(), ignoreCase = true)
+                                }
+                                master?.copy(id = 0, dateAdded = dateStr, isCompleted = false)
+                            }
+                        }
+
                         if (task != null) {
                             val updated = task.copy(isCompleted = !task.isCompleted)
                             val updatedWithReset = if (!updated.isCompleted) {
@@ -112,13 +130,21 @@ class TodayAppWidgetProvider : AppWidgetProvider() {
                             } else {
                                 updated
                             }
-                            db.taskDao().updateTask(updatedWithReset)
-                            
-                            // Cancel or schedule exact reminder alarm
-                            if (updatedWithReset.isCompleted) {
-                                NotificationReceiver.cancelReminder(context, updatedWithReset)
-                            } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
-                                NotificationReceiver.scheduleExactReminder(context, updatedWithReset)
+                            if (task.id == 0) {
+                                val newId = db.taskDao().insertTask(updatedWithReset).toInt()
+                                val inserted = updatedWithReset.copy(id = newId)
+                                if (inserted.isCompleted) {
+                                    NotificationReceiver.cancelReminder(context, inserted)
+                                } else if (inserted.reminderTime != null && inserted.reminderTime > System.currentTimeMillis()) {
+                                    NotificationReceiver.scheduleExactReminder(context, inserted)
+                                }
+                            } else {
+                                db.taskDao().updateTask(updatedWithReset)
+                                if (updatedWithReset.isCompleted) {
+                                    NotificationReceiver.cancelReminder(context, updatedWithReset)
+                                } else if (updatedWithReset.reminderTime != null && updatedWithReset.reminderTime > System.currentTimeMillis()) {
+                                    NotificationReceiver.scheduleExactReminder(context, updatedWithReset)
+                                }
                             }
                             
                             // Broadcast update to notify widgets to redraw

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -28,8 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 
 /**
  * Helper to match category string with its designated icon.
@@ -38,6 +41,7 @@ import com.gratus.mytodo.ui.theme.AppFontSizes
 fun getCategoryIcon(category: String): ImageVector {
     val lower = category.lowercase().trim()
     return when {
+        lower.contains("sticky") -> Icons.Default.PushPin
         lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Icons.Default.Work
         lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Icons.Default.Person
         lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Icons.Default.ShoppingCart
@@ -110,10 +114,10 @@ fun CategoryChip(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Category Chip - Selected")
+@Preview(showBackground = true, name = "Category Chip - Selected")
 @Composable
 fun CategoryChipPreview() {
-    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+    SoftTodoTheme {
         CategoryChip(
             category = "Work",
             isSelected = true,

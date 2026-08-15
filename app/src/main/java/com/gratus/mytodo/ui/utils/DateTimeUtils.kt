@@ -111,8 +111,8 @@ object DateTimeUtils {
         date2.set(Calendar.SECOND, 0)
         date2.set(Calendar.MILLISECOND, 0)
         
-        val diff = date2.timeInMillis - date1.timeInMillis
-        return (diff / (24 * 60 * 60 * 1000)).toInt()
+        val diff = date2.timeInMillis.toDouble() - date1.timeInMillis.toDouble()
+        return Math.round(diff / (24.0 * 60.0 * 60.0 * 1000.0)).toInt()
     }
 
     fun isSameDay(cal1: Calendar, cal2: Calendar): Boolean {

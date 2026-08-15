@@ -63,6 +63,7 @@ fun TaskItemCard(
     task: Task,
     colorSchemeType: String,
     isFlat: Boolean = false,
+    isHighlighted: Boolean = false,
     onToggleComplete: () -> Unit,
     onDelete: () -> Unit,
     onLongClick: () -> Unit,
@@ -327,6 +328,14 @@ fun TaskItemCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .alpha(if (isCompleted) 0.8f else 1.0f)
+                .then(
+                    if (isHighlighted) {
+                        Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    } else Modifier
+                )
                 .pointerInput(onLongClick) {
                     detectTapGestures(
                         onLongPress = { _ -> onLongClick() }
@@ -349,7 +358,9 @@ fun TaskItemCard(
                 .testTag("task_item_${task.id}"),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isCompleted) {
+                containerColor = if (isHighlighted) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                } else if (isCompleted) {
                     if (colorSchemeType == "minimal") {
                         if (isDark) Color(0x15FFFFFF) else Color(0x33B0AAB9)
                     } else {
@@ -359,7 +370,9 @@ fun TaskItemCard(
                     MaterialTheme.colorScheme.surface
                 }
             ),
-            border = when (colorSchemeType) {
+            border = if (isHighlighted) {
+                androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else when (colorSchemeType) {
                 "simple" -> borderStrokeSimple(isCompleted)
                 "minimal" -> {
                     if (isCompleted) {

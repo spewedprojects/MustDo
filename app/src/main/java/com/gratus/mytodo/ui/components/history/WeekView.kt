@@ -57,7 +57,7 @@ fun WeekView(
     colorSchemeType: String,
     onQueryChange: (String) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
-    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
+    onNavigateToHomeDate: ((Calendar, Int?) -> Unit)? = null
 ) {
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f // The line is a heuristic (a "quick rule of thumb") used to detect if the current app theme is in "Dark Mode" based on the actual color of the background. Alternatively, '.background.luminance()' < 0.5f can also be used.
     val groupedByWeek = remember(tasks) {
@@ -83,6 +83,7 @@ fun WeekView(
                 val total = weekTasks.size
                 val done = weekTasks.count { it.isCompleted }
                 val weekDate = DateTimeUtils.parseDbDate(weekStartStr) ?: Date()
+                val weekCal = Calendar.getInstance().apply { time = weekDate }
                 val weekLabel = SimpleDateFormat("MMM dd, yyyy", LocalLocale.current.platformLocale).format(weekDate)
 
                 Card(
@@ -177,17 +178,12 @@ fun WeekView(
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 activeStickyInWeek.forEach { stickyTask ->
-                                    val stickyCal = remember(stickyTask.dateAdded) {
-                                        Calendar.getInstance().apply {
-                                            time = DateTimeUtils.parseDbDate(stickyTask.dateAdded) ?: Date()
-                                        }
-                                    }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(8.dp))
                                             .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
-                                            .clickable { onNavigateToHomeDate?.invoke(stickyCal) }
+                                            .clickable { onNavigateToHomeDate?.invoke(weekCal, stickyTask.id) }
                                             .padding(horizontal = 10.dp, vertical = 6.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
@@ -245,6 +241,7 @@ fun WeekView(
                                             val dayStr = dayList[index]
                                             val dayTasks = daysInWeek[dayStr] ?: emptyList()
                                             val dayDate = DateTimeUtils.parseDbDate(dayStr) ?: Date()
+                                            val dayCal = Calendar.getInstance().apply { time = dayDate }
                                             val dayLabelStr = SimpleDateFormat("EEE, MMM dd", LocalLocale.current.platformLocale).format(dayDate)
 
                                             Card(
@@ -273,15 +270,17 @@ fun WeekView(
                                                         Row(
                                                             verticalAlignment = Alignment.CenterVertically,
                                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                                            modifier = Modifier.then(
-                                                                if (onNavigateToHomeDate != null) {
-                                                                    Modifier.clickable {
-                                                                        val dateObj = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
-                                                                        val cal = Calendar.getInstance().apply { time = dateObj }
-                                                                        onNavigateToHomeDate(cal)
-                                                                    }
-                                                                } else Modifier
-                                                            )
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clip(RoundedCornerShape(4.dp))
+                                                                .then(
+                                                                    if (onNavigateToHomeDate != null) {
+                                                                        Modifier.clickable {
+                                                                            onNavigateToHomeDate(dayCal, task.id)
+                                                                        }
+                                                                    } else Modifier
+                                                                )
+                                                                .padding(vertical = 2.dp)
                                                         ) {
                                                             if (task.category != null) {
                                                                 Icon(
@@ -324,19 +323,134 @@ fun WeekView(
     }
 }
 
-@Preview(showBackground = true, name = "History Week View")
-@Composable
-fun WeekViewPreview() {
-    val sampleTasks = listOf(
-        Task(id = 1, title = "Task 1", description = "", priority = 1, dateAdded = "2026-08-13", isCompleted = true),
-        Task(id = 2, title = "Task 2", description = "", priority = 2, dateAdded = "2026-08-14")
+private val previewTasks = listOf(
+    // Current Week
+    Task(id = 1, title = "Design System Review", description = "", priority = 1, dateAdded = "2026-08-15", isCompleted = true, category = "Work"),
+    Task(id = 2, title = "Team Sync Meeting", description = "", priority = 2, dateAdded = "2026-08-15", isCompleted = false, category = "Work"),
+    Task(id = 3, title = "Cardio Session (5km)", description = "", priority = 2, dateAdded = "2026-08-14", isCompleted = true, category = "Fitness"),
+    Task(id = 4, title = "Grocery Run", description = "", priority = 3, dateAdded = "2026-08-14", isCompleted = false, category = "Errands"),
+    Task(id = 5, title = "Review Pull Requests", description = "", priority = 1, dateAdded = "2026-08-13", isCompleted = true, category = "Work"),
+    Task(id = 6, title = "Pay Electricity Bill", description = "", priority = 2, dateAdded = "2026-08-13", isCompleted = true, category = "Finance"),
+    Task(id = 7, title = "Buy Protein Powder", description = "", priority = 4, dateAdded = "2026-08-13", isCompleted = false, category = "Fitness"),
+    Task(id = 8, title = "Dentist Appointment", description = "", priority = 1, dateAdded = "2026-08-13", isCompleted = false, category = "Health"),
+    Task(id = 9, title = "Water Plants", description = "", priority = 4, dateAdded = "2026-08-12", isCompleted = true, category = "Home"),
+    Task(id = 10, title = "Kotlin Coroutines Study", description = "", priority = 3, dateAdded = "2026-08-11", isCompleted = true, category = "Learn"),
+    // Previous Week
+    Task(id = 11, title = "Monthly Budget Review", description = "", priority = 1, dateAdded = "2026-08-08", isCompleted = true, category = "Finance"),
+    Task(id = 12, title = "Sprint Retrospective", description = "", priority = 2, dateAdded = "2026-08-07", isCompleted = true, category = "Work"),
+    Task(id = 13, title = "Weekend Hike", description = "", priority = 3, dateAdded = "2026-08-06", isCompleted = true, category = "Fitness")
+)
+
+private val previewStickyTasks = listOf(
+    Task(
+        id = 100,
+        title = "Daily Morning Pushups",
+        description = "50 reps before breakfast",
+        priority = 2,
+        dateAdded = "2026-08-10",
+        category = "Sticky",
+        isRecurring = true
+    ),
+    Task(
+        id = 101,
+        title = "Read 20 pages",
+        description = "Non-fiction book",
+        priority = 3,
+        dateAdded = "2026-08-10",
+        category = "Sticky",
+        isRecurring = true
     )
-    SoftTodoTheme {
-        WeekView(
-            tasks = sampleTasks,
-            colorSchemeType = "minimal",
-            onQueryChange = {},
-            onZoomLevelSet = {}
-        )
+)
+
+@Preview(showBackground = true, name = "Week View - Minimal Light")
+@Composable
+fun WeekViewMinimalLightPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            WeekView(
+                tasks = previewTasks,
+                stickyTasks = previewStickyTasks,
+                colorSchemeType = "minimal",
+                onQueryChange = {},
+                onZoomLevelSet = {},
+                onNavigateToHomeDate = { _, _ -> }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Week View - Colorful Dark Theme")
+@Composable
+fun WeekViewColorfulDarkPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            WeekView(
+                tasks = previewTasks,
+                stickyTasks = previewStickyTasks,
+                colorSchemeType = "colorful",
+                onQueryChange = {},
+                onZoomLevelSet = {},
+                onNavigateToHomeDate = { _, _ -> }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Week View - Simple Theme")
+@Composable
+fun WeekViewSimpleThemePreview() {
+    SoftTodoTheme(colorSchemeType = "simple", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            WeekView(
+                tasks = previewTasks,
+                stickyTasks = emptyList(),
+                colorSchemeType = "simple",
+                onQueryChange = {},
+                onZoomLevelSet = {},
+                onNavigateToHomeDate = { _, _ -> }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Week View - Overflow Day (+X more)")
+@Composable
+fun WeekViewOverflowDayPreview() {
+    val overflowTasks = listOf(
+        Task(id = 1, title = "Morning Standup", description = "", priority = 1, dateAdded = "2026-08-15", isCompleted = true, category = "Work"),
+        Task(id = 2, title = "Design Review", description = "", priority = 2, dateAdded = "2026-08-15", isCompleted = true, category = "Work"),
+        Task(id = 3, title = "Backend API Integration", description = "", priority = 1, dateAdded = "2026-08-15", isCompleted = false, category = "Work"),
+        Task(id = 4, title = "Write Unit Tests", description = "", priority = 2, dateAdded = "2026-08-15", isCompleted = false, category = "Work"),
+        Task(id = 5, title = "Deploy to Staging", description = "", priority = 3, dateAdded = "2026-08-15", isCompleted = false, category = "Work"),
+        Task(id = 6, title = "Evening Gym", description = "", priority = 4, dateAdded = "2026-08-15", isCompleted = false, category = "Fitness")
+    )
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            WeekView(
+                tasks = overflowTasks,
+                stickyTasks = emptyList(),
+                colorSchemeType = "minimal",
+                onQueryChange = {},
+                onZoomLevelSet = {},
+                onNavigateToHomeDate = { _, _ -> }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true, name = "Week View - Empty State")
+@Composable
+fun WeekViewEmptyPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        Box(modifier = Modifier.padding(16.dp)) {
+            WeekView(
+                tasks = emptyList(),
+                stickyTasks = emptyList(),
+                colorSchemeType = "minimal",
+                onQueryChange = {},
+                onZoomLevelSet = {},
+                onNavigateToHomeDate = { _, _ -> }
+            )
+        }
     }
 }

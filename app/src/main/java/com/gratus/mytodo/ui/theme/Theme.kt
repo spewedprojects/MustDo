@@ -81,27 +81,49 @@ fun Color.shiftHueSat(hueDelta: Float, satScale: Float): Color {
 fun buildColorfulColorScheme(isDark: Boolean, hueShift: Float, satScale: Float): ColorScheme {
     return if (isDark) {
         darkColorScheme(
-            primary   = ColorfulDarkPrimary.shiftHueSat(hueShift, satScale),
-            onPrimary = SimpleLightBg,
-            secondary = ColorfulDarkSecondary.shiftHueSat(hueShift, satScale),
-            tertiary  = ColorfulDarkTertiary.shiftHueSat(hueShift, satScale),
-            background = ColorfulDarkBg.shiftHueSat(hueShift, satScale),
-            onBackground = ColorfulDarkOnBg,
-            surface   = ColorfulDarkCard.shiftHueSat(hueShift, satScale),
-            onSurface = ColorfulDarkOnBg,
-            outline   = ColorfulDarkOnBg.copy(alpha = 0.2f)
+            primary            = ColorfulDarkPrimary.shiftHueSat(hueShift, satScale),
+            onPrimary          = SimpleLightBg,
+            primaryContainer   = ColorfulDarkPrimaryContainer.shiftHueSat(hueShift, satScale),
+            onPrimaryContainer = ColorfulDarkOnPrimaryContainer.shiftHueSat(hueShift, satScale),
+            secondary          = ColorfulDarkSecondary.shiftHueSat(hueShift, satScale),
+            onSecondary        = SimpleLightBg,
+            secondaryContainer = ColorfulDarkSecondaryContainer.shiftHueSat(hueShift, satScale),
+            onSecondaryContainer = ColorfulDarkOnSecondaryContainer.shiftHueSat(hueShift, satScale),
+            tertiary           = ColorfulDarkTertiary.shiftHueSat(hueShift, satScale),
+            onTertiary         = SimpleLightBg,
+            tertiaryContainer  = ColorfulDarkTertiaryContainer.shiftHueSat(hueShift, satScale),
+            onTertiaryContainer = ColorfulDarkOnTertiaryContainer.shiftHueSat(hueShift, satScale),
+            background         = ColorfulDarkBg.shiftHueSat(hueShift, satScale),
+            onBackground       = ColorfulDarkOnBg,
+            surface            = ColorfulDarkCard.shiftHueSat(hueShift, satScale),
+            onSurface          = ColorfulDarkOnBg,
+            surfaceVariant     = ColorfulDarkSurfaceVariant.shiftHueSat(hueShift, satScale),
+            onSurfaceVariant   = ColorfulDarkOnSurfaceVariant.shiftHueSat(hueShift, satScale),
+            outline            = ColorfulDarkOnBg.copy(alpha = 0.2f),
+            outlineVariant     = ColorfulDarkOnBg.copy(alpha = 0.1f)
         )
     } else {
         lightColorScheme(
-            primary   = ColorfulLightPrimary.shiftHueSat(hueShift, satScale),
-            onPrimary = SimpleLightBg,
-            secondary = ColorfulLightSecondary.shiftHueSat(hueShift, satScale),
-            tertiary  = ColorfulLightTertiary.shiftHueSat(hueShift, satScale),
-            background = ColorfulLightBg.shiftHueSat(hueShift, satScale),
-            onBackground = ColorfulLightOnBg,
-            surface   = ColorfulLightCard.shiftHueSat(hueShift, satScale),
-            onSurface = ColorfulLightOnBg,
-            outline   = ColorfulLightOnBg.copy(alpha = 0.1f)
+            primary            = ColorfulLightPrimary.shiftHueSat(hueShift, satScale),
+            onPrimary          = SimpleLightBg,
+            primaryContainer   = ColorfulLightPrimaryContainer.shiftHueSat(hueShift, satScale),
+            onPrimaryContainer = ColorfulLightOnPrimaryContainer.shiftHueSat(hueShift, satScale),
+            secondary          = ColorfulLightSecondary.shiftHueSat(hueShift, satScale),
+            onSecondary        = SimpleLightBg,
+            secondaryContainer = ColorfulLightSecondaryContainer.shiftHueSat(hueShift, satScale),
+            onSecondaryContainer = ColorfulLightOnSecondaryContainer.shiftHueSat(hueShift, satScale),
+            tertiary           = ColorfulLightTertiary.shiftHueSat(hueShift, satScale),
+            onTertiary         = SimpleLightBg,
+            tertiaryContainer  = ColorfulLightTertiaryContainer.shiftHueSat(hueShift, satScale),
+            onTertiaryContainer = ColorfulLightOnTertiaryContainer.shiftHueSat(hueShift, satScale),
+            background         = ColorfulLightBg.shiftHueSat(hueShift, satScale),
+            onBackground       = ColorfulLightOnBg,
+            surface            = ColorfulLightCard.shiftHueSat(hueShift, satScale),
+            onSurface          = ColorfulLightOnBg,
+            surfaceVariant     = ColorfulLightSurfaceVariant.shiftHueSat(hueShift, satScale),
+            onSurfaceVariant   = ColorfulLightOnSurfaceVariant.shiftHueSat(hueShift, satScale),
+            outline            = ColorfulLightOnBg.copy(alpha = 0.1f),
+            outlineVariant     = ColorfulLightOnBg.copy(alpha = 0.05f)
         )
     }
 }
@@ -146,12 +168,20 @@ fun SoftTodoTheme(
                     onPrimary = Color.Black,
                     primaryContainer = Color(0xFF1E1B4B),
                     onPrimaryContainer = Color(0xFFC7D2FE),
+                    secondary = MinimalDarkAccent,
+                    onSecondary = Color.Black,
+                    secondaryContainer = Color(0xFF2E234A),
+                    onSecondaryContainer = Color(0xFFDDD6FE),
+                    tertiary = Color(0xFFF472B6),
+                    onTertiary = Color.Black,
+                    tertiaryContainer = Color(0xFF4C1D35),
+                    onTertiaryContainer = Color(0xFFFBCFE8),
                     background = MinimalDarkBg,
                     onBackground = MinimalDarkText,
                     surface = MinimalDarkCard,
                     onSurface = MinimalDarkText,
+                    surfaceVariant = Color(0xFF1E1A29),
                     onSurfaceVariant = MinimalDarkText.copy(alpha = 0.6f),
-                    secondary = MinimalDarkAccent,
                     outline = Color(0xFF1E293B)
                 )
             } else {
@@ -160,12 +190,20 @@ fun SoftTodoTheme(
                     onPrimary = Color.White,
                     primaryContainer = Color(0xFFE0E7FF),
                     onPrimaryContainer = Color(0xFF1E1B4B),
+                    secondary = MinimalLightAccent,
+                    onSecondary = Color.White,
+                    secondaryContainer = Color(0xFFEDE9FE),
+                    onSecondaryContainer = Color(0xFF312E81),
+                    tertiary = Color(0xFFEC4899),
+                    onTertiary = Color.White,
+                    tertiaryContainer = Color(0xFFFCE7F3),
+                    onTertiaryContainer = Color(0xFF831843),
                     background = MinimalLightBg,
                     onBackground = MinimalLightText,
                     surface = MinimalLightCard2,
                     onSurface = MinimalLightText,
+                    surfaceVariant = Color(0xFFF1EDF7),
                     onSurfaceVariant = MinimalLightText.copy(alpha = 0.6f),
-                    secondary = MinimalLightAccent,
                     outline = Color(0xFFE2E8F0)
                 )
             }

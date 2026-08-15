@@ -46,6 +46,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.PriorityAmber
 import com.gratus.mytodo.ui.theme.PriorityOrange
 import com.gratus.mytodo.ui.theme.PriorityRed
@@ -143,7 +144,7 @@ fun AlarmScreen(
                         if (task.description.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = task.description,
+                                text = parseStyledDescription(task.description),
                                 style = MaterialTheme.typography.bodyMedium,
                                 textAlign = TextAlign.Center,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -293,7 +294,7 @@ fun AlarmScreenDarkPreview() {
         AlarmScreen(
             activeTasks = listOf(
                 Task(id = 1, title = "Critical Presentation Draft", description = "Review the slides for the meeting and send to manager", priority = 1, dateAdded = "2026-06-27"),
-                Task(id = 2, title = "Call dentist", description = "Schedule checkup", priority = 3, dateAdded = "2026-06-27")
+                Task(id = 2, title = "Call dentist", description = "**Schedule checkup**", priority = 3, dateAdded = "2026-06-27")
             ),
             onCompleteTask = {},
             onSnoozeTask = { _, _ -> },

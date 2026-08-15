@@ -155,17 +155,42 @@ class NotificationReceiver : BroadcastReceiver() {
                             showNotification(context, task)
                         }
 
+                        val todayStr = com.gratus.mytodo.ui.utils.DateTimeUtils.formatDbDate(System.currentTimeMillis())
+                        val isStickyTask = task.category?.equals("Sticky", ignoreCase = true) == true
+
+                        // If it's a sticky task and this task entry is not for today, operate on/create today's entry
+                        val targetTask = if (isStickyTask && task.dateAdded != todayStr) {
+                            val directToday = db.taskDao().getTasksForDateDirect(todayStr).find {
+                                it.category?.equals("Sticky", ignoreCase = true) == true &&
+                                it.title.trim().equals(task.title.trim(), ignoreCase = true)
+                            }
+                            if (directToday != null) {
+                                directToday
+                            } else {
+                                val newToday = task.copy(
+                                    id = 0,
+                                    dateAdded = todayStr,
+                                    repeatedTimes = 0,
+                                    snoozedUntil = null
+                                )
+                                val newId = db.taskDao().insertTask(newToday).toInt()
+                                newToday.copy(id = newId)
+                            }
+                        } else {
+                            task
+                        }
+
                         // Clear snooze field in DB since the alarm/reminder fired now
-                        val updatedTaskWithReset = task.copy(snoozedUntil = null)
+                        val updatedTaskWithReset = targetTask.copy(snoozedUntil = null)
                         db.taskDao().updateTask(updatedTaskWithReset)
 
                         // Handle repeating alerts: 1x to 4x
-                        if (task.repeatedTimes + 1 < task.repeatCount) {
+                        if (targetTask.repeatedTimes + 1 < targetTask.repeatCount) {
                             val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
                             val nextAlarmTime = System.currentTimeMillis() + (sharedPrefs.getInt("reminder_repeat_interval", 10) * 60 * 1000L)
                             
                             val updatedTask = updatedTaskWithReset.copy(
-                                repeatedTimes = task.repeatedTimes + 1,
+                                repeatedTimes = targetTask.repeatedTimes + 1,
                                 nextReminderTime = nextAlarmTime
                             )
                             db.taskDao().updateTask(updatedTask)

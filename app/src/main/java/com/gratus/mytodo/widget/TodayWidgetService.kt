@@ -34,9 +34,66 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
     override fun onDataSetChanged() {
         val dateStr = DateTimeUtils.formatDbDate(System.currentTimeMillis())
         try {
+            val sharedPrefs = context.getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
+            val isStickyEnabled = sharedPrefs.getBoolean("enable_sticky_tasks", true)
             val db = TaskDatabase.getDatabase(context)
             tasks = runBlocking(Dispatchers.IO) {
-                db.taskDao().getTasksForDateDirect(dateStr)
+                val allTasks = db.taskDao().getAllTasksDirect()
+                val directTasks = allTasks.filter { it.dateAdded == dateStr }
+                if (!isStickyEnabled) {
+                    return@runBlocking directTasks.filter { !it.category.equals("Sticky", ignoreCase = true) }
+                }
+
+                val stickyGroups = allTasks
+                    .filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+                    .groupBy { it.title.trim().lowercase(java.util.Locale.ROOT) }
+
+                val combined = directTasks.toMutableList()
+                stickyGroups.forEach { (_, instances) ->
+                    val master = instances.minByOrNull { it.dateAdded } ?: return@forEach
+                    val isEveryday = master.deadlineDate.isNullOrBlank()
+                    val deadlineDate = master.deadlineDate
+                    val terminatedDate = master.terminatedDate
+
+                    if (dateStr < master.dateAdded) return@forEach
+                    if (!terminatedDate.isNullOrBlank() && dateStr > terminatedDate) return@forEach
+                    if (!isEveryday && deadlineDate != null && dateStr > deadlineDate) return@forEach
+
+                    val alreadyHasDirect = directTasks.any {
+                        it.category?.equals("Sticky", ignoreCase = true) == true &&
+                        it.title.trim().equals(master.title.trim(), ignoreCase = true)
+                    }
+
+                    if (!alreadyHasDirect) {
+                        if (isEveryday) {
+                            combined.add(
+                                master.copy(
+                                    id = 0,
+                                    dateAdded = dateStr,
+                                    isCompleted = false,
+                                    repeatedTimes = 0,
+                                    subTasks = master.subTasks.map { it.copy(isCompleted = false) },
+                                    snoozedUntil = null
+                                )
+                            )
+                        } else {
+                            val completedPrior = instances.any { it.dateAdded < dateStr && it.isCompleted }
+                            if (!completedPrior) {
+                                combined.add(
+                                    master.copy(
+                                        id = 0,
+                                        dateAdded = dateStr,
+                                        isCompleted = false,
+                                        repeatedTimes = 0,
+                                        subTasks = master.subTasks.map { it.copy(isCompleted = false) },
+                                        snoozedUntil = null
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+                combined.sortedBy { it.priority }
             }
         } catch (e: Exception) {
             android.util.Log.e("TodayWidgetFactory", "Error loading tasks for widget: ${e.message}", e)
@@ -94,6 +151,8 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
         // Set click fill-in intent for task completion toggle
         val fillInIntent = Intent().apply {
             putExtra("task_id", task.id)
+            putExtra("task_title", task.title)
+            putExtra("is_sticky", task.category?.equals("Sticky", ignoreCase = true) == true)
         }
         rv.setOnClickFillInIntent(R.id.widget_item_check, fillInIntent)
 

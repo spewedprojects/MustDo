@@ -81,7 +81,7 @@ import androidx.compose.ui.platform.LocalLocale
 fun HistoryScreen(
     viewModel: MainViewModel,
     colorSchemeType: String,
-    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
+    onNavigateToHomeDate: ((Calendar, Int?) -> Unit)? = null
 ) {
     val tasks by viewModel.historyTasks.collectAsState(initial = emptyList())
     val query by viewModel.searchQuery.collectAsState()
@@ -121,7 +121,7 @@ fun HistoryScreenContent(
     onZoomChange: (Int) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
     onFilterChange: (FilterOption) -> Unit,
-    onNavigateToHomeDate: ((Calendar) -> Unit)? = null
+    onNavigateToHomeDate: ((Calendar, Int?) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -328,7 +328,8 @@ fun HistoryScreenContent(
                         tasks = regularTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
-                        onZoomLevelSet = onZoomLevelSet
+                        onZoomLevelSet = onZoomLevelSet,
+                        onNavigateToHomeDate = onNavigateToHomeDate
                     )
                     2 -> WeekView(
                         tasks = regularTasks,
@@ -415,7 +416,7 @@ fun HistoryScreenNavigablePreview() {
             onZoomChange = {},
             onZoomLevelSet = {},
             onFilterChange = {},
-            onNavigateToHomeDate = {}
+            onNavigateToHomeDate = { _, _ -> }
         )
     }
 }

@@ -19,6 +19,7 @@
 package com.gratus.mytodo.ui.components.settings
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -69,6 +70,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.R
 import com.gratus.mytodo.ui.theme.AppFontSizes
+import com.gratus.mytodo.ui.theme.MinimalDarkCardBorder
+import com.gratus.mytodo.ui.theme.MinimalLightCardBorder
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import kotlin.text.format
 
@@ -81,6 +84,7 @@ fun AestheticsSettingsCard(
     customizerExpanded: Boolean = false,
     activeTheme: String,
     activeScheme: String,
+    colorSchemeType: String,
     colorfulHueShift: Float,
     colorfulSatScale: Float,
     onThemeChange: (String) -> Unit,
@@ -91,7 +95,15 @@ fun AestheticsSettingsCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = when (colorSchemeType) {
+            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            )
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+        },
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -229,13 +241,13 @@ fun AestheticsSettingsCard(
                                     },
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    val DiscoverTune = ImageVector.vectorResource(R.drawable.discover_tune_18dp)
+                                    val discoverTuneIcon = ImageVector.vectorResource(R.drawable.discover_tune_18dp)
                                     Icon(
-                                        imageVector = DiscoverTune,
+                                        imageVector = discoverTuneIcon,
                                         contentDescription = "Customize colorful palette",
                                         tint = if (isSelected) MaterialTheme.colorScheme.secondary
                                         else MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(18.dp)//.rotate(90f) // remove rotation later if you like it otherwise
                                     )
                                 }
                             }
@@ -372,13 +384,14 @@ fun AestheticsSettingsCard(
     }
 }
 
-@Preview(showBackground = true, name = "Aesthetics Settings Card - Minimal Light")
+@Preview(showBackground = false, name = "Aesthetics Settings Card - Minimal Light")
 @Composable
 fun AestheticsSettingsCardLightPreview() {
-    SoftTodoTheme(themeMode = "light", colorSchemeType = "minimal") {
+    SoftTodoTheme(themeMode = "light", colorSchemeType = "simple") {
         AestheticsSettingsCard(
             activeTheme = "light",
             activeScheme = "minimal",
+            colorSchemeType = "minimal",
             colorfulHueShift = 0f,
             colorfulSatScale = 1f,
             onThemeChange = {},
@@ -398,6 +411,7 @@ fun AestheticsSettingsCardDarkPreview() {
             activeTheme = "dark",
             customizerExpanded = true,
             activeScheme = "colorful",
+            colorSchemeType = "colorful",
             colorfulHueShift = 10f,
             colorfulSatScale = 1.1f,
             onThemeChange = {},

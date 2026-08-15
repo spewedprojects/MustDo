@@ -211,7 +211,7 @@ fun ZoomableTaskRow(task: Task, zoomLevel: Int, colorSchemeType: String) {
     }
 }
 
-@Preview(showBackground = true, name = "Zoomable Task Row - Level 1 (Compact)")
+@Preview(showBackground = false, name = "Zoomable Task Row - Level 1 (Compact)")
 @Composable
 fun ZoomableTaskRowLevel1Preview() {
     SoftTodoTheme(colorSchemeType = "minimal") {
@@ -225,7 +225,7 @@ fun ZoomableTaskRowLevel1Preview() {
     }
 }
 
-@Preview(showBackground = true, name = "Zoomable Task Row - Level 2 (Medium)")
+@Preview(showBackground = false, name = "Zoomable Task Row - Level 2 (Medium)")
 @Composable
 fun ZoomableTaskRowLevel2Preview() {
     SoftTodoTheme(colorSchemeType = "minimal") {
@@ -239,7 +239,7 @@ fun ZoomableTaskRowLevel2Preview() {
     }
 }
 
-@Preview(showBackground = true, name = "Zoomable Task Row - Level 3 (Detailed)")
+@Preview(showBackground = false, name = "Zoomable Task Row - Level 3 (Detailed)")
 @Composable
 fun ZoomableTaskRowLevel3Preview() {
     SoftTodoTheme(colorSchemeType = "minimal") {

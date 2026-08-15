@@ -211,6 +211,7 @@ fun SettingsScreenContent(
     ) {
         // Feature Preferences Container (Sticky Tasks Toggle)
         FeaturePreferencesCard(
+            colorSchemeType = String(),
             isStickyEnabled = isStickyEnabled,
             onStickyEnabledChange = onStickyEnabledChange
         )
@@ -219,6 +220,7 @@ fun SettingsScreenContent(
         AestheticsSettingsCard(
             activeTheme = activeTheme,
             activeScheme = activeScheme,
+            colorSchemeType = String(),
             colorfulHueShift = colorfulHueShift,
             colorfulSatScale = colorfulSatScale,
             onThemeChange = onThemeChange,
@@ -230,6 +232,7 @@ fun SettingsScreenContent(
         // Reminder Settings Container
         ReminderSettingsCard(
             isAlarmPermissionGranted = isAlarmPermissionGranted,
+            colorSchemeType = String(),
             isNotificationPermissionGranted = isNotificationPermissionGranted,
             isFullScreenPermissionGranted = isFullScreenPermissionGranted,
             activeInterval = activeInterval,
@@ -242,6 +245,7 @@ fun SettingsScreenContent(
         // Backups & Exports Container
         BackupsRestorationsCard(
             context = context,
+            colorSchemeType = String(),
             importLauncher = importLauncher,
             onExportJson = onExportJson,
             onExportDb = onExportDb
@@ -249,13 +253,13 @@ fun SettingsScreenContent(
     }
 }
 
-@Preview(showBackground = true, heightDp = 1800, name = "Settings Screen - Scrollable Light")
+@Preview(showBackground = false, heightDp = 1800, name = "Settings Screen - Scrollable Light")
 @Composable
 fun SettingsScreenPreview() {
-    SoftTodoTheme {
+    SoftTodoTheme (colorSchemeType = "simple"){
         SettingsScreenContent(
             activeTheme = "light",
-            activeScheme = "minimal",
+            activeScheme = "simple",
             activeInterval = 10,
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,

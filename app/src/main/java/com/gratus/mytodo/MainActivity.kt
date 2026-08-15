@@ -235,8 +235,11 @@ fun MainLayout(
                 Screen.HISTORY  -> HistoryScreen(
                     viewModel = viewModel,
                     colorSchemeType = colorSchemeType,
-                    onNavigateToHomeDate = { targetCal ->
+                    onNavigateToHomeDate = { targetCal, taskId ->
                         viewModel.setDate(targetCal)
+                        if (taskId != null) {
+                            viewModel.setHighlightedTaskId(taskId)
+                        }
                         viewModel.setActiveScreen(Screen.HOME)
                     }
                 )

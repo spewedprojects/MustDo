@@ -1,5 +1,6 @@
 package com.gratus.mytodo.ui.components.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -41,22 +42,6 @@ import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import com.gratus.mytodo.ui.theme.getCategoryAccentColor
 
 /**
- * Resolves color coding accents matching default and custom category titles.
- */
-//fun getCategoryAccentColor(category: String): Color {
-//    val lower = category.lowercase().trim()
-//    return when {
-//        lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
-//        lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
-//        lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
-//        lower.contains("gym") || lower.contains("workout") || lower.contains("exercise") || lower.contains("run") || lower.contains("fit") || lower.contains("sport") || lower.contains("fitness") || lower.contains("dumbbell") -> Color(0xFF9C27B0) // Purple
-//        lower.contains("health") || lower.contains("doctor") || lower.contains("hospital") || lower.contains("med") || lower.contains("medicine") || lower.contains("favorite") -> Color(0xFFFF5722) // Orange
-//        lower.contains("learn") || lower.contains("study") || lower.contains("book") || lower.contains("school") || lower.contains("class") || lower.contains("course") || lower.contains("read") -> Color(0xFFFFC107) // Amber/Yellow
-//        else -> Color(0xFF673AB7) // Indigo/default
-//    }
-//}
-
-/**
  * Category group header card component.
  */
 @Composable
@@ -83,21 +68,13 @@ fun CategoryCard(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         border = when (colorSchemeType) {
-            "simple" -> androidx.compose.foundation.BorderStroke(
-                1.dp, 
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            "simple" -> BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
-            "minimal" -> androidx.compose.foundation.BorderStroke(
-                1.dp, 
-                if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder
+            "minimal" -> BorderStroke(1.dp, if (isDark) MinimalDarkCardBorder else MinimalLightCardBorder
             )
-            "system" -> androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            "system" -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
             )
-            else -> androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             )
         },
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)

@@ -21,6 +21,7 @@ package com.gratus.mytodo.ui.components.settings
 import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.ManagedActivityResultLauncher
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -55,6 +56,7 @@ import java.io.OutputStream
 @Composable
 fun BackupsRestorationsCard(
     context: Context,
+    colorSchemeType: String,
     importLauncher: ManagedActivityResultLauncher<String, android.net.Uri?>,
     onExportJson: (OutputStream) -> Boolean,
     onExportDb: (OutputStream) -> Boolean,
@@ -63,7 +65,15 @@ fun BackupsRestorationsCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = when (colorSchemeType) {
+            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+            "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            )
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            )
+        },
     ) {
         Column(
             modifier = Modifier.padding(18.dp),

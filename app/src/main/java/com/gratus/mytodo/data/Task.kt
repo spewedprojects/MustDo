@@ -56,7 +56,8 @@ data class Task(
     val category: String? = null, // Nullable category tag (e.g. Work, Personal)
     val reminderType: String = "notification", // "notification" or "alarm"
     val snoozedUntil: Long? = null, // Millisecond timestamp for when the snooze expires, or null
-    val deadlineDate: String? = null // Last date or deadline string "yyyy-MM-dd" for sticky tasks, or null
+    val deadlineDate: String? = null, // Last date or deadline string "yyyy-MM-dd" for sticky tasks, or null
+    val terminatedDate: String? = null // Date on which the sticky task was terminated, or null
 )
 
 /**

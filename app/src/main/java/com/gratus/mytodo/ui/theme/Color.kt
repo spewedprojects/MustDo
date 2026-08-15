@@ -18,6 +18,8 @@
 
 package com.gratus.mytodo.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Priority Colors (Red to Yellow, 1 to 4)
@@ -43,16 +45,32 @@ val ColorfulLightOnBg = Color(0xFF2C1A2E)
 val ColorfulLightCard = Color(0x99FFFFFF)        // Semi-transparent for layered glassmorphism look
 val ColorfulLightCard2 = Color(0xFFF4F5FD)       // Opaque but not true white
 val ColorfulLightPrimary = Color(0xFFEC407A)     // Pastel Rose
+val ColorfulLightPrimaryContainer = Color(0xFFFCE4EC) // Soft pastel rose container
+val ColorfulLightOnPrimaryContainer = Color(0xFF880E4F) // Deep rose text
 val ColorfulLightSecondary = Color(0xFFAB47BC)   // Pastel Orchid Purple
+val ColorfulLightSecondaryContainer = Color(0xFFF3E5F5) // Soft pastel orchid container
+val ColorfulLightOnSecondaryContainer = Color(0xFF4A148C) // Deep orchid text
 val ColorfulLightTertiary = Color(0xFF26A69A)    // Pastel Teal
+val ColorfulLightTertiaryContainer = Color(0xFFE0F2F1) // Soft pastel teal container
+val ColorfulLightOnTertiaryContainer = Color(0xFF004D40) // Deep teal text
+val ColorfulLightSurfaceVariant = Color(0xFFF5EDF4) // Tinted pastel background for chips/inputs
+val ColorfulLightOnSurfaceVariant = Color(0xFF5C4761) // Muted plum text
 
 val ColorfulDarkBg = Color(0xFF140D1E)           // Deep indigo/night sky base
 val ColorfulDarkOnBg = Color(0xFFE8E1F0)
 val ColorfulDarkCard = Color(0x334E3470)         // Layered glow cards
 val ColorfulDarkCard2 = Color(0xFF160D1E)        // Solid color
 val ColorfulDarkPrimary = Color(0xFFF06292)      // Pastel glow rose
+val ColorfulDarkPrimaryContainer = Color(0xFF4A152E) // Deep rose/wine container
+val ColorfulDarkOnPrimaryContainer = Color(0xFFFFD1DC) // Light pastel rose text
 val ColorfulDarkSecondary = Color(0xFFBA68C8)    // Pastel glow orchid purple
+val ColorfulDarkSecondaryContainer = Color(0xFF381545) // Deep plum/orchid container
+val ColorfulDarkOnSecondaryContainer = Color(0xFFE8C5F5) // Light pastel orchid text
 val ColorfulDarkTertiary = Color(0xFF4DB6AC)     // Pastel glow mint-teal
+val ColorfulDarkTertiaryContainer = Color(0xFF0D3834) // Deep teal container
+val ColorfulDarkOnTertiaryContainer = Color(0xFF80CBC4) // Light pastel teal text
+val ColorfulDarkSurfaceVariant = Color(0xFF241630) // Deep indigo-tinted surface for chips/inputs
+val ColorfulDarkOnSurfaceVariant = Color(0xFFBCAEC4) // Muted lilac text
 
 // Minimalist Theme Color Palette (Clean Minimal lavender bg with semi-transparent card overlays)
 val MinimalLightBg = Color(0xFFF7F2FA)
@@ -167,12 +185,14 @@ fun getMinimalPriorityColors(priority: Int, isCompleted: Boolean, isDark: Boolea
  * Resolves color coding accents matching default and custom category titles.
  * Returns monochromatic palette colors when colorSchemeType is "simple".
  */
+@Composable
 fun getCategoryAccentColor(category: String, colorSchemeType: String = "", isDark: Boolean = false): Color {
     if (colorSchemeType == "simple") {
         return if (isDark) SimpleDarkAccent else SimpleLightAccent
     }
     val lower = category.lowercase().trim()
     return when {
+        lower.contains("sticky") -> MaterialTheme.colorScheme.primary
         lower.contains("work") || lower.contains("job") || lower.contains("office") || lower.contains("meet") || lower.contains("project") -> Color(0xFFE91E63) // Pink/Rose
         lower.contains("personal") || lower.contains("home") || lower.contains("self") || lower.contains("me") || lower.contains("private") -> Color(0xFF2196F3) // Blue
         lower.contains("errand") || lower.contains("shop") || lower.contains("buy") || lower.contains("grocer") || lower.contains("store") || lower.contains("market") -> Color(0xFF4CAF50) // Green
