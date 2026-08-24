@@ -50,17 +50,19 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
 
                 val combined = directTasks.toMutableList()
                 stickyGroups.forEach { (_, instances) ->
-                    val master = instances.minByOrNull { it.dateAdded } ?: return@forEach
+                    val activeCandidates = instances.filter {
+                        it.dateAdded <= dateStr &&
+                        (it.terminatedDate.isNullOrBlank() || dateStr <= it.terminatedDate)
+                    }
+                    if (activeCandidates.isEmpty()) return@forEach
+
+                    val master = activeCandidates.minByOrNull { it.dateAdded } ?: return@forEach
                     val isEveryday = master.deadlineDate.isNullOrBlank()
                     val deadlineDate = master.deadlineDate
-                    val terminatedDate = master.terminatedDate
 
-                    if (dateStr < master.dateAdded) return@forEach
-                    if (!terminatedDate.isNullOrBlank() && dateStr > terminatedDate) return@forEach
                     if (!isEveryday && deadlineDate != null && dateStr > deadlineDate) return@forEach
 
                     val alreadyHasDirect = directTasks.any {
-                        it.category?.equals("Sticky", ignoreCase = true) == true &&
                         it.title.trim().equals(master.title.trim(), ignoreCase = true)
                     }
 
@@ -77,7 +79,7 @@ class TodayWidgetFactory(private val context: Context) : RemoteViewsService.Remo
                                 )
                             )
                         } else {
-                            val completedPrior = instances.any { it.dateAdded < dateStr && it.isCompleted }
+                            val completedPrior = activeCandidates.any { it.dateAdded < dateStr && it.isCompleted }
                             if (!completedPrior) {
                                 combined.add(
                                     master.copy(

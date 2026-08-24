@@ -153,8 +153,8 @@ fun HomeScreen(
         onAddTask = { t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
             viewModel.addTask(t, d, p, targetDate, replicateDates, everydayCount, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
         },
-        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
-            viewModel.updateTaskFields(task.id, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
+        onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType, replicateDates, everydayCount ->
+            viewModel.updateTaskFields(task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType, replicateDates, everydayCount)
         },
         onCopy = { viewModel.setCopiedTask(it) },
         onAddCustomCategory = { viewModel.addCustomCategory(it) },
@@ -195,7 +195,7 @@ fun HomeScreenContent(
     onToggleComplete: (Task) -> Unit,
     onDeleteTask: (Task) -> Unit,
     onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?, String) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String, List<String>, Int) -> Unit,
     onCopy: (CopiedTask) -> Unit,
     onAddCustomCategory: (String) -> Unit,
     onDeleteCustomCategory: (String) -> Unit,
@@ -348,8 +348,8 @@ fun HomeScreenContent(
             taskToEdit = taskToEdit,
             onDismiss = { onTaskToEditChange(null) },
             onAddTask = onAddTask,
-            onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType ->
-                onEditTask(task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType)
+            onEditTask = { task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType, replicateDates, everydayCount ->
+                onEditTask(task, t, d, p, targetDate, reminderTimeMillis, repeatCount, subTasks, category, reminderType, replicateDates, everydayCount)
                 onTaskToEditChange(null)
                 Toast.makeText(context, "Task updated!", Toast.LENGTH_SHORT).show()
             },
@@ -400,7 +400,7 @@ fun HomeScreenEmptyStatePreview() {
             onToggleComplete = {},
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},
@@ -433,7 +433,7 @@ fun HomeScreenDarkModePreview() {
             onToggleComplete = {},
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},
@@ -466,7 +466,7 @@ fun HomeScreenDeleteDialogPreview() {
             onToggleComplete = {},
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},
@@ -499,7 +499,7 @@ fun HomeScreenColorfulDarkThemePreview() {
             onToggleComplete = {},
             onDeleteTask = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
             onCopy = {},
             onAddCustomCategory = {},
             onDeleteCustomCategory = {},

@@ -139,7 +139,7 @@ fun TaskPriorityCategoryRow(
                     Text(
                         text = priority.toString(),
                         fontWeight = FontWeight.Bold,
-                        color = if (priority == 4) Color.DarkGray else Color.White
+                        color = if (priority in 3..4) Color.DarkGray else Color.White
                     )
                 }
                 Icon(
@@ -193,7 +193,7 @@ fun TaskPriorityCategoryRow(
                                 Text(
                                     text = p.toString(),
                                     fontWeight = FontWeight.Bold,
-                                    color = if (p == 4) Color.DarkGray else Color.White,
+                                    color = if (p in 3..4) Color.DarkGray else Color.White,
                                     fontSize = 12.sp
                                 )
                             }
@@ -341,12 +341,12 @@ fun TaskPriorityCategoryRow(
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Task Priority & Category Row")
+@androidx.compose.ui.tooling.preview.Preview(showBackground = false, name = "Task Priority & Category Row")
 @Composable
 fun TaskPriorityCategoryRowPreview() {
     com.gratus.mytodo.ui.theme.SoftTodoTheme {
         TaskPriorityCategoryRow(
-            priority = 1,
+            priority = 2,
             selectedCategory = "Work",
             customCategories = listOf("Work", "Fitness", "Errands"),
             onPriorityChange = {},

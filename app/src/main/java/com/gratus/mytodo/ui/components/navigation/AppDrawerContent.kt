@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +48,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.gratus.mytodo.ui.theme.AppFontSizes
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 
+/**
+ * The content and the function of the drawer used in the app.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppDrawerContent(
@@ -79,7 +84,7 @@ fun AppDrawerContent(
                 text = "MustDo",
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Black,
-                    letterSpacing = (0.5).sp
+                    letterSpacing = (1).sp
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
@@ -91,9 +96,10 @@ fun AppDrawerContent(
         }
 
         Spacer(modifier = Modifier.height(18.dp))
-        Divider(
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f),
-            modifier = Modifier.padding(horizontal = 16.dp)
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            thickness = DividerDefaults.Thickness,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
         )
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -105,65 +111,26 @@ fun AppDrawerContent(
         )
 
         navItems.forEach { (screenKey, name, icon) ->
-            if (screenKey == Screen.SETTINGS) {
-                val selected = activeScreen == screenKey
-                val containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                val contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 2.dp)
-                        .height(56.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .combinedClickable(
-                            onClick = {
-                                onSetActiveScreen(screenKey)
-                                onCloseDrawer()
-                            },
-                            onLongClick = {
-                                onSetActiveScreen(Screen.ISSUE_TRACKER)
-                                onCloseDrawer()
-                            }
-                        ),
-                    color = containerColor,
-                    contentColor = contentColor,
-                    shape = RoundedCornerShape(28.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 16.dp, end = 24.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = name,
-                            tint = if (selected) MaterialTheme.colorScheme.primary else contentColor
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = AppFontSizes.medium,
-                            color = contentColor
-                        )
-                    }
-                }
-            } else {
-                NavigationDrawerItem(
-                    icon = { Icon(imageVector = icon, contentDescription = name) },
-                    label = { Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
-                    selected = activeScreen == screenKey,
-                    onClick = {
-                        onSetActiveScreen(screenKey)
-                        onCloseDrawer()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                    colors = NavigationDrawerItemDefaults.colors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        unselectedContainerColor = Color.Transparent
-                    )
+            NavigationDrawerItem(
+                icon = { Icon(imageVector = icon, contentDescription = name) },
+                label = {
+                    Text(name, fontWeight = FontWeight.Bold, fontSize = AppFontSizes.medium) },
+                shape = RoundedCornerShape(18.dp),
+                selected = activeScreen == screenKey,
+                onClick = {
+                    onSetActiveScreen(screenKey)
+                    onCloseDrawer()
+                },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                colors = NavigationDrawerItemDefaults.colors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedContainerColor = Color.Transparent
                 )
-            }
+            )
+        // Removed on 24th August 2026 in v7.1.1
+        // Removed if.else condition for settings screen and related combinedclick since Issue Tracker screen is removed.
+        // Issues are now handled in the separate app.
+        // A future possible link to this app can be added using combined click.
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -186,10 +153,12 @@ fun AppDrawerContent(
         }
 
         Text(
-            text = "v${BuildConfig.VERSION_NAME}" + " (${BuildConfig.VERSION_CODE})",
+            text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             fontSize = AppFontSizes.micro,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
             textAlign = TextAlign.Center
         )
     }
@@ -198,9 +167,9 @@ fun AppDrawerContent(
 @Preview(showBackground = true, name = "App Navigation Drawer")
 @Composable
 fun AppDrawerContentPreview() {
-    SoftTodoTheme(colorSchemeType = "minimal") {
+    SoftTodoTheme(colorSchemeType = "colorful") {
         AppDrawerContent(
-            activeScreen = Screen.HOME,
+            activeScreen = Screen.SETTINGS,
             colorSchemeType = "minimal",
             onSetActiveScreen = {},
             onCloseDrawer = {}

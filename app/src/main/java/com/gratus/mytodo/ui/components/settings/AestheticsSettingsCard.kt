@@ -81,7 +81,7 @@ import kotlin.text.format
 @Composable
 fun AestheticsSettingsCard(
     modifier: Modifier = Modifier,
-    customizerExpanded: Boolean = false,
+    customizerExpanded: Boolean,
     activeTheme: String,
     activeScheme: String,
     colorSchemeType: String,
@@ -97,11 +97,11 @@ fun AestheticsSettingsCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = when (colorSchemeType) {
-            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            "simple" -> BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
             "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
             )
-            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.0f)
             )
         },
     ) {
@@ -390,8 +390,9 @@ fun AestheticsSettingsCardLightPreview() {
     SoftTodoTheme(themeMode = "light", colorSchemeType = "simple") {
         AestheticsSettingsCard(
             activeTheme = "light",
-            activeScheme = "minimal",
-            colorSchemeType = "minimal",
+            customizerExpanded = false,
+            activeScheme = "simple",
+            colorSchemeType = "simple",
             colorfulHueShift = 0f,
             colorfulSatScale = 1f,
             onThemeChange = {},

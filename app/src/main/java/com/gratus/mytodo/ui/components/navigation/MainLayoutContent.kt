@@ -219,10 +219,9 @@ fun MainLayoutContent(
                             } else {
                                 Text(
                                     text = when (activeScreen) {
-                                        Screen.HISTORY -> "Historical Timelines"
+                                        Screen.HISTORY -> "History"
                                         Screen.STATS -> "Completion Statistics"
-                                        Screen.SETTINGS -> "Settings Profile"
-                                        Screen.ISSUE_TRACKER -> "Issue Tracker"
+                                        Screen.SETTINGS -> "App Settings"
                                         else -> "MustDo"
                                     },
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),

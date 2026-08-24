@@ -39,9 +39,11 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.data.Task
 import com.gratus.mytodo.ui.SortOption
+import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import com.gratus.mytodo.ui.utils.DateTimeUtils
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
@@ -57,6 +59,7 @@ sealed interface HomeListItem {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeTasksPager(
+    modifier: Modifier,
     pagerState: PagerState,
     initialPage: Int,
     baseDate: Calendar,
@@ -70,8 +73,7 @@ fun HomeTasksPager(
     onToggleComplete: (Task) -> Unit,
     onToggleSubComplete: (Task, Int) -> Unit,
     getTasksForDate: (String) -> Flow<List<Task>>,
-    onPreselectCategory: (String?) -> Unit,
-    modifier: Modifier = Modifier
+    onPreselectCategory: (String?) -> Unit
 ) {
     HorizontalPager(
         state = pagerState,
@@ -136,11 +138,10 @@ fun HomeTasksPager(
                             compareBy<HomeListItem> { item ->
                                 when (item) {
                                     is HomeListItem.CategoryGroup -> {
-                                        val pending = item.tasks.filter { !it.isCompleted }
-                                        pending.minOfOrNull { it.priority } ?: item.tasks.minOfOrNull { it.priority } ?: 4
+                                        item.tasks.minOfOrNull { it.priority } ?: 4
                                     }
                                     is HomeListItem.TaglessTask -> {
-                                        if (item.task.isCompleted) 5 else item.task.priority
+                                        item.task.priority
                                     }
                                 }
                             }.thenBy { item ->
@@ -298,7 +299,7 @@ fun HomeTasksPager(
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@androidx.compose.ui.tooling.preview.Preview(showBackground = true, name = "Home Tasks Pager")
+@Preview(showBackground = true, name = "Home Tasks Pager", backgroundColor = 0XFFF)
 @Composable
 fun HomeTasksPagerPreview() {
     val sampleTasks = listOf(
@@ -306,8 +307,9 @@ fun HomeTasksPagerPreview() {
         Task(id = 2, title = "Task Title 2", description = "Desc 2", priority = 2, dateAdded = "2026-08-13")
     )
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 500, pageCount = { 1000 })
-    com.gratus.mytodo.ui.theme.SoftTodoTheme {
+    SoftTodoTheme {
         HomeTasksPager(
+            modifier = Modifier,
             pagerState = pagerState,
             initialPage = 500,
             baseDate = Calendar.getInstance(),

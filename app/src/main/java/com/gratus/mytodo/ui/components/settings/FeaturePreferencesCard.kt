@@ -67,7 +67,7 @@ fun FeaturePreferencesCard(
             )
             "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
             )
-            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.0f)
             )
         }
     ) {

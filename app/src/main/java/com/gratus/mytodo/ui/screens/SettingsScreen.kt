@@ -219,6 +219,7 @@ fun SettingsScreenContent(
         // Theme & Scheme Configuration Container
         AestheticsSettingsCard(
             activeTheme = activeTheme,
+            customizerExpanded = false,
             activeScheme = activeScheme,
             colorSchemeType = String(),
             colorfulHueShift = colorfulHueShift,

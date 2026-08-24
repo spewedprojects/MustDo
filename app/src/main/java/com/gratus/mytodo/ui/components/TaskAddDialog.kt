@@ -92,7 +92,7 @@ fun TaskAddDialog(
     colorSchemeType: String = "minimal",
     onDismiss: () -> Unit,
     onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?, String) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String, List<String>, Int) -> Unit,
     onTerminateForever: ((Task) -> Unit)? = null,
     taskToEdit: Task? = null,
     preselectedCategory: String? = null,
@@ -133,7 +133,7 @@ fun TaskAddDialogContent(
     colorSchemeType: String = "minimal",
     onDismiss: () -> Unit,
     onAddTask: (String, String, Int, Calendar, List<String>, Int, Long?, Int, List<SubTask>, String?, String) -> Unit,
-    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String) -> Unit,
+    onEditTask: (Task, String, String, Int, Calendar, Long?, Int, List<SubTask>, String?, String, List<String>, Int) -> Unit,
     onTerminateForever: ((Task) -> Unit)? = null,
     taskToEdit: Task? = null,
     preselectedCategory: String? = null,
@@ -242,6 +242,16 @@ fun TaskAddDialogContent(
                         onDeleteCategory = onDeleteCategory
                     )
 
+                    val wasStickyOriginal = taskToEdit?.category?.equals("Sticky", ignoreCase = true) == true
+                    if (taskToEdit != null && wasStickyOriginal && !isStickyCategory) {
+                        Text(
+                            text = "Note: Changing to a regular category will make this a single-day task on this date and stop future daily recurrence.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
+
                     // Sub-tasks Section
                     SubTaskSection(
                         subTasksList = subTasksList,
@@ -260,8 +270,9 @@ fun TaskAddDialogContent(
                         onRepeatCountChange = { repeatCount = it }
                     )
 
-                    // Multi-day Replication Controls (for creation mode)
-                    if (taskToEdit == null) {
+                    // Multi-day Replication Controls (shown for creation mode OR when converting a non-sticky task to Sticky in edit mode)
+                    val showReplicationSection = (taskToEdit == null) || (!wasStickyOriginal && isStickyCategory)
+                    if (showReplicationSection) {
                         MultiDayReplicationSection(
                             isStickyCategory = isStickyCategory,
                             everydayCount = everydayCount,
@@ -419,7 +430,9 @@ fun TaskAddDialogContent(
                                     repeatCount,
                                     subTasksList,
                                     selectedCategory,
-                                    reminderType
+                                    reminderType,
+                                    replicationDates.toList(),
+                                    everydayCount
                                 )
                             }
                         },
@@ -458,7 +471,7 @@ fun TaskAddDialogMinimalLightPreview() {
             lastUsedPriority = 1,
             onDismiss = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> }
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -472,7 +485,7 @@ fun TaskAddDialogScheduledTaskPreview() {
             lastUsedPriority = 2,
             onDismiss = {},
             onAddTask = { _, _, _, _, _, _, _, _, _, _, _ -> },
-            onEditTask = { _, _, _, _, _, _, _, _, _, _ -> },
+            onEditTask = { _, _, _, _, _, _, _, _, _, _, _, _ -> },
             taskToEdit = previewTask.copy(
                 title = "Team Sync Meeting",
                 description = "Discuss weekly progress and updates",

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.LockClock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -114,7 +115,9 @@ fun TaskItemCard(
             }
 
             // Title & Description (Markdown parsed dynamically)
-            Column(modifier = Modifier.weight(1f).padding(start = 6.dp)) {
+            Column(modifier = Modifier
+                .weight(1f)
+                .padding(start = 6.dp)) {
                 Text(
                     text = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
@@ -272,6 +275,34 @@ fun TaskItemCard(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
+                    val terminationDate = task.terminatedDate
+                    if (terminationDate != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockClock,
+                                contentDescription = "Everyday Task Termination date",
+                                tint = if (isCompleted) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                },
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "Terminated on $terminationDate",
+                                fontSize = AppFontSizes.micro,
+                                color = if (isCompleted) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.tertiary
+                                },
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
             }
 
@@ -280,7 +311,7 @@ fun TaskItemCard(
                 getMinimalPriorityColors(task.priority, isCompleted, isDark)
             } else {
                 val containerCol = getPriorityBoxColor(task.priority, isCompleted)
-                val textCol = if (task.priority == 4 || isCompleted) Color.DarkGray else Color.White
+                val textCol = if (task.priority in 3..4 || isCompleted) Color.DarkGray else Color.White
                 val borderCol = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                 PriorityThemeBadgeColors(containerCol, textCol, borderCol)
             }
@@ -332,7 +363,11 @@ fun TaskItemCard(
                     if (isHighlighted) {
                         Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                            .border(
+                                2.dp,
+                                MaterialTheme.colorScheme.primary,
+                                RoundedCornerShape(12.dp)
+                            )
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
                     } else Modifier
                 )
@@ -397,7 +432,7 @@ private val sampleTasks = listOf(
         id = 1,
         title = "Finish Project Proposal",
         description = "Finalize the budget and project timeline",
-        priority = 1,
+        priority = 3,
         dateAdded = "2026-08-13",
         category = "Work",
         reminderTime = System.currentTimeMillis() + 3600000,

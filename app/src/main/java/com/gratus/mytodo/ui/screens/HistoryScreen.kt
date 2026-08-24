@@ -23,56 +23,45 @@ import com.gratus.mytodo.ui.components.history.MainFontText
 import com.gratus.mytodo.ui.components.history.MonthView
 import com.gratus.mytodo.ui.components.history.WeekView
 import com.gratus.mytodo.ui.components.history.YearView
-import com.gratus.mytodo.ui.components.history.ZoomableTaskRow
+import com.gratus.mytodo.ui.components.InlineCalendarView
 
-import android.app.DatePickerDialog
 import androidx.compose.animation.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.gratus.mytodo.data.Task
+import com.gratus.mytodo.data.SubTask
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import com.gratus.mytodo.ui.utils.detectPinchZoom
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 
 import com.gratus.mytodo.ui.FilterOption
 import com.gratus.mytodo.ui.MainViewModel
-import com.gratus.mytodo.ui.components.parseStyledDescription
 import com.gratus.mytodo.ui.theme.*
 import com.gratus.mytodo.ui.utils.DateTimeUtils
-import java.text.SimpleDateFormat
 import java.util.*
-import com.gratus.mytodo.ui.components.dialogs.getCategoryIcon
-//import com.gratus.mytodo.ui.components.home.getCategoryAccentColor
-import androidx.compose.ui.platform.LocalLocale
 
 /**
  * Historical records screen with filtering, date classification, and structural pinch-to-zoom.
@@ -87,6 +76,7 @@ fun HistoryScreen(
     val query by viewModel.searchQuery.collectAsState()
     val zoomLevel by viewModel.historyZoomLevel.collectAsState()
     val activeFilter by viewModel.historyFilter.collectAsState()
+    val taskDates by viewModel.taskDates.collectAsState()
 
     val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
 
@@ -97,6 +87,7 @@ fun HistoryScreen(
         activeFilter = activeFilter,
         colorSchemeType = colorSchemeType,
         isStickyEnabled = isStickyEnabled,
+        taskDates = taskDates,
         onQueryChange = { viewModel.setSearchQuery(it) },
         onZoomChange = { viewModel.zoomHistory(it) },
         onZoomLevelSet = { viewModel.setHistoryZoom(it) },
@@ -117,17 +108,23 @@ fun HistoryScreenContent(
     activeFilter: FilterOption,
     colorSchemeType: String,
     isStickyEnabled: Boolean = true,
+    taskDates: Set<String> = emptySet(),
     onQueryChange: (String) -> Unit,
     onZoomChange: (Int) -> Unit,
     onZoomLevelSet: (Int) -> Unit,
     onFilterChange: (FilterOption) -> Unit,
     onNavigateToHomeDate: ((Calendar, Int?) -> Unit)? = null
 ) {
-    val context = LocalContext.current
-
     // State to throttling scale gestures
     var lastGestureTime by remember { mutableLongStateOf(0L) }
     var isDoubleColumnInDayView by rememberSaveable { mutableStateOf(false) }
+    var showCalendarPopup by remember { mutableStateOf(false) }
+
+    val currentSelectedCal = remember(query) {
+        DateTimeUtils.parseDbDate(query)?.let { date ->
+            Calendar.getInstance().apply { time = date }
+        } ?: Calendar.getInstance()
+    }
 
     // Pinch to Zoom math utilizing custom cumulative pinch detector
     val pinchZoomModifier = Modifier.pointerInput(Unit) {
@@ -178,9 +175,25 @@ fun HistoryScreenContent(
                     placeholder = { Text("Search title, description...") },
                     leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = "Search") },
                     trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { onQueryChange("") }) {
-                                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear search")
+                        Row {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { onQueryChange("") }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear search"
+                                    )
+                                }
+                            }
+                            if (zoomLevel == 3) {
+                                IconButton(
+                                    onClick = { isDoubleColumnInDayView = !isDoubleColumnInDayView }
+                                ) {
+                                    Icon(
+                                        imageVector = if (isDoubleColumnInDayView) Icons.Default.ViewAgenda else Icons.Default.GridView,
+                                        contentDescription = if (isDoubleColumnInDayView) "Switch to Single Column" else "Switch to Double Column",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     },
@@ -202,45 +215,61 @@ fun HistoryScreenContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Date pick picker trigger
-                    IconButton(
-                        onClick = {
-                            val calendar = Calendar.getInstance()
-                            DatePickerDialog(
-                                context,
-                                { _, year, month, dayOfMonth ->
-                                    val picked = Calendar.getInstance().apply {
-                                        set(Calendar.YEAR, year)
-                                        set(Calendar.MONTH, month)
-                                        set(Calendar.DAY_OF_MONTH, dayOfMonth)
-                                    }
-                                    val queryStr = DateTimeUtils.formatDbDate(picked)
-                                    onQueryChange(queryStr) // Filter by picked date
-                                },
-                                calendar.get(Calendar.YEAR),
-                                calendar.get(Calendar.MONTH),
-                                calendar.get(Calendar.DAY_OF_MONTH)
-                            ).show()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Pick Date as Filter",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    if (zoomLevel == 3) {
+                    Box {
                         IconButton(
-                            onClick = { isDoubleColumnInDayView = !isDoubleColumnInDayView }
+                            onClick = { showCalendarPopup = !showCalendarPopup },
+                            modifier = Modifier.background(
+                                color = if (showCalendarPopup) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+                                shape = CircleShape)
                         ) {
                             Icon(
-                                imageVector = if (isDoubleColumnInDayView) Icons.Default.ViewAgenda else Icons.Default.GridView,
-                                contentDescription = if (isDoubleColumnInDayView) "Switch to Single Column" else "Switch to Double Column",
-                                tint = MaterialTheme.colorScheme.primary
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Pick Date as Filter",
+                                tint = if (showCalendarPopup || DateTimeUtils.parseDbDate(query) != null) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
                             )
                         }
-                    }
 
+                        if (showCalendarPopup) {
+                            Popup(
+                                alignment = Alignment.TopStart,
+                                offset = IntOffset(x = 0, y = with(LocalDensity.current) { 48.dp.roundToPx() }),
+                                onDismissRequest = { showCalendarPopup = false },
+                                properties = PopupProperties(
+                                    focusable = true,
+                                    dismissOnBackPress = true,
+                                    dismissOnClickOutside = true
+                                )
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .widthIn(min = 300.dp, max = 360.dp)
+                                        .shadow(3.dp, RoundedCornerShape(24.dp))
+                                        .background(MaterialTheme.colorScheme.dialogContainerColor, RoundedCornerShape(24.dp))
+                                        .border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            RoundedCornerShape(24.dp)
+                                        )
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    InlineCalendarView(
+                                        selectedDate = currentSelectedCal,
+                                        onDateSelected = { pickedCal ->
+                                            val queryStr = DateTimeUtils.formatDbDate(pickedCal)
+                                            onQueryChange(queryStr)
+                                            showCalendarPopup = false
+                                        },
+                                        taskDates = taskDates,
+                                        colorSchemeType = colorSchemeType
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // Filter dropdown
                     Row(
@@ -397,18 +426,220 @@ fun HistoryScreenContent(
 }
 }
 
-@Preview(showBackground = true, showSystemUi = true, name = "History Screen - Navigable Light Mode")
-@Composable
-fun HistoryScreenNavigablePreview() {
-    val sampleTasks = listOf(
-        Task(id = 1, title = "Finish Proposal", description = "Finalize budget", priority = 1, dateAdded = "2026-08-10", isCompleted = true),
-        Task(id = 2, title = "Grocery Shopping", description = "Milk, Eggs, Bread", priority = 2, dateAdded = "2026-08-11", isCompleted = true),
-        Task(id = 3, title = "Gym Workout", description = "Leg day", priority = 3, dateAdded = "2026-08-12", isCompleted = false)
+private val sampleHistoryTasks = listOf(
+    Task(
+        id = 1,
+        title = "Finalize Product Roadmap",
+        description = "Align with engineering on Q4 deliverables:\n- Core feature milestones\n- Performance tuning\n- Release schedule",
+        priority = 1,
+        dateAdded = "2026-08-24",
+        isCompleted = false,
+        category = "Work",
+        reminderTime = System.currentTimeMillis() + 7200000,
+        subTasks = listOf(
+            SubTask("Core feature milestones", true),
+            SubTask("Performance tuning", false),
+            SubTask("Release schedule", false)
+        )
+    ),
+    Task(
+        id = 2,
+        title = "Client Presentation",
+        description = "Demo new invoice automation feature",
+        priority = 2,
+        dateAdded = "2026-08-24",
+        isCompleted = true,
+        category = "Work"
+    ),
+    Task(
+        id = 3,
+        title = "Evening 5km Run",
+        description = "Tempo run in the park",
+        priority = 3,
+        dateAdded = "2026-08-24",
+        isCompleted = false,
+        category = "Fitness"
+    ),
+    Task(
+        id = 4,
+        title = "Grocery Shopping",
+        description = "Milk, Eggs, Whole Wheat Bread, Avocados",
+        priority = 4,
+        dateAdded = "2026-08-23",
+        isCompleted = true,
+        category = "Errands"
+    ),
+    Task(
+        id = 5,
+        title = "Monthly Cloud Cost Audit",
+        description = "Review AWS & GCP compute expenses",
+        priority = 1,
+        dateAdded = "2026-08-23",
+        isCompleted = true,
+        category = "Finance"
+    ),
+    Task(
+        id = 6,
+        title = "Doctor Consultation",
+        description = "Annual health checkup",
+        priority = 2,
+        dateAdded = "2026-08-20",
+        isCompleted = true,
+        category = "Health"
+    ),
+    Task(
+        id = 7,
+        title = "Read Clean Architecture",
+        description = "Chapters 7 to 9",
+        priority = 3,
+        dateAdded = "2026-08-15",
+        isCompleted = true,
+        category = "Learn"
+    ),
+    Task(
+        id = 8,
+        title = "Car Service & Oil Change",
+        description = "Routine maintenance at dealership",
+        priority = 2,
+        dateAdded = "2025-11-10",
+        isCompleted = true,
+        category = "Errands"
     )
+)
+
+private val sampleHistoryStickyTasks = listOf(
+    Task(
+        id = 100,
+        title = "Daily Morning Push-ups",
+        description = "50 reps before breakfast",
+        priority = 2,
+        dateAdded = "2026-08-01",
+        category = "Sticky",
+        isRecurring = true
+    )
+)
+
+@Preview(showBackground = true, showSystemUi = true, name = "History Screen - Navigable Minimal Light (Expanded)")
+@Composable
+fun HistoryScreenExpandedLightPreview() {
     SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
         HistoryScreenContent(
-            tasks = sampleTasks,
+            tasks = sampleHistoryTasks + sampleHistoryStickyTasks,
             query = "",
+            zoomLevel = 3,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true, name = "History Screen - Navigable Colorful Dark (Expanded)")
+@Composable
+fun HistoryScreenColorfulDarkPreview() {
+    SoftTodoTheme(colorSchemeType = "colorful", themeMode = "dark") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks + sampleHistoryStickyTasks,
+            query = "",
+            zoomLevel = 3,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "colorful",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Week View (Zoom Level 2)")
+@Composable
+fun HistoryScreenWeekViewPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks + sampleHistoryStickyTasks,
+            query = "",
+            zoomLevel = 2,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Month View (Zoom Level 1)")
+@Composable
+fun HistoryScreenMonthViewPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks + sampleHistoryStickyTasks,
+            query = "",
+            zoomLevel = 1,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Year View (Zoom Level 0)")
+@Composable
+fun HistoryScreenYearViewPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks + sampleHistoryStickyTasks,
+            query = "",
+            zoomLevel = 0,
+            activeFilter = FilterOption.ALL,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Filtered Pending Query")
+@Composable
+fun HistoryScreenFilteredPendingPreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = sampleHistoryTasks.filter { !it.isCompleted },
+            query = "Roadmap",
+            zoomLevel = 3,
+            activeFilter = FilterOption.LEFT_INCOMPLETE,
+            colorSchemeType = "minimal",
+            onQueryChange = {},
+            onZoomChange = {},
+            onZoomLevelSet = {},
+            onFilterChange = {},
+            onNavigateToHomeDate = { _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "History Screen - Empty State")
+@Composable
+fun HistoryScreenEmptyStatePreview() {
+    SoftTodoTheme(colorSchemeType = "minimal", themeMode = "light") {
+        HistoryScreenContent(
+            tasks = emptyList(),
+            query = "Nonexistent Search",
             zoomLevel = 3,
             activeFilter = FilterOption.ALL,
             colorSchemeType = "minimal",

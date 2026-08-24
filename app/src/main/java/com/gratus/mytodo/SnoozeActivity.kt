@@ -79,11 +79,15 @@ class SnoozeActivity : ComponentActivity() {
         val sharedPrefs = getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
         val themeMode = sharedPrefs.getString("theme", "auto") ?: "auto"
         val colorSchemeType = sharedPrefs.getString("color_scheme", "minimal") ?: "minimal"
+        val colorfulHueShift = sharedPrefs.getFloat("colorful_hue_shift", 0f)
+        val colorfulSatScale = sharedPrefs.getFloat("colorful_sat_scale", 1f)
 
         setContent {
             SoftTodoTheme(
                 themeMode = themeMode,
-                colorSchemeType = colorSchemeType
+                colorSchemeType = colorSchemeType,
+                colorfulHueShift = colorfulHueShift,
+                colorfulSatScale = colorfulSatScale
             ) {
                 SnoozeDialog(
                     colorSchemeType = colorSchemeType,

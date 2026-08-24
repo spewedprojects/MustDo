@@ -22,6 +22,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -57,13 +60,20 @@ fun InlineCalendarView(
     colorSchemeType: String = "minimal"
 ) {
     val isDark = MaterialTheme.colorScheme.background.red < 0.2f
-    
-    // Remember displayed month/year state
-    var currentMonthCal by remember(selectedDate) {
-        mutableStateOf(Calendar.getInstance().apply {
+    val scope = rememberCoroutineScope()
+
+    // Use a large number of pages to simulate infinite swiping
+    val initialPage = 5000
+    val pagerState = rememberPagerState(initialPage = initialPage) { 10000 }
+
+    // Derive the displayed month from the pager state
+    val currentMonthCal = remember(pagerState.currentPage, selectedDate) {
+        val cal = Calendar.getInstance().apply {
             time = selectedDate.time
             set(Calendar.DAY_OF_MONTH, 1)
-        })
+        }
+        cal.add(Calendar.MONTH, pagerState.currentPage - initialPage)
+        cal
     }
 
     val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
@@ -113,11 +123,9 @@ fun InlineCalendarView(
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
                         onClick = {
-                            val prev = Calendar.getInstance().apply {
-                                time = currentMonthCal.time
-                                add(Calendar.MONTH, -1)
+                            scope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
                             }
-                            currentMonthCal = prev
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
@@ -131,11 +139,9 @@ fun InlineCalendarView(
                     Spacer(modifier = Modifier.width(4.dp))
                     IconButton(
                         onClick = {
-                            val next = Calendar.getInstance().apply {
-                                time = currentMonthCal.time
-                                add(Calendar.MONTH, 1)
+                            scope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
                             }
-                            currentMonthCal = next
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
@@ -165,91 +171,122 @@ fun InlineCalendarView(
                 }
             }
 
-            // Days Grid
-            val daysInMonth = currentMonthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-            // Adjust day of week index so Monday = 0, Sunday = 6
-            val firstDayOfWeek = (currentMonthCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
-            val totalGridSlots = ((daysInMonth + firstDayOfWeek + 6) / 7) * 7
+            // Days Grid with HorizontalPager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) { page ->
+                val monthCal = remember(page, selectedDate) {
+                    val cal = Calendar.getInstance().apply {
+                        time = selectedDate.time
+                        set(Calendar.DAY_OF_MONTH, 1)
+                    }
+                    cal.add(Calendar.MONTH, page - initialPage)
+                    cal
+                }
+                
+                MonthGrid(
+                    monthCal = monthCal,
+                    todayStr = todayStr,
+                    selectedStr = selectedStr,
+                    taskDates = taskDates,
+                    onDateSelected = onDateSelected
+                )
+            }
+        }
+    }
+}
 
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                var currentSlot = 0
-                while (currentSlot < totalGridSlots) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+@Composable
+private fun MonthGrid(
+    monthCal: Calendar,
+    todayStr: String,
+    selectedStr: String,
+    taskDates: Set<String>,
+    onDateSelected: (Calendar) -> Unit
+) {
+    val daysInMonth = monthCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+    // Adjust day of week index so Monday = 0, Sunday = 6
+    val firstDayOfWeek = (monthCal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+    val totalGridSlots = ((daysInMonth + firstDayOfWeek + 6) / 7) * 7
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        var currentSlot = 0
+        while (currentSlot < totalGridSlots) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                for (i in 0 until 7) {
+                    val dayNumber = currentSlot - firstDayOfWeek + 1
+                    val isValidDay = dayNumber in 1..daysInMonth
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        for (i in 0 until 7) {
-                            val dayNumber = currentSlot - firstDayOfWeek + 1
-                            val isValidDay = dayNumber in 1..daysInMonth
+                        if (isValidDay) {
+                            val cellCal = (monthCal.clone() as Calendar).apply {
+                                set(Calendar.DAY_OF_MONTH, dayNumber)
+                            }
+                            val dateStr = DateTimeUtils.formatDbDate(cellCal)
+                            val isToday = dateStr == todayStr
+                            val isSelected = dateStr == selectedStr
+                            val hasTask = taskDates.contains(dateStr)
 
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f),
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            else -> Color.Transparent
+                                        }
+                                    )
+                                    .then(
+                                        if (isToday && !isSelected) {
+                                            Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                        } else Modifier
+                                    )
+                                    .clickable {
+                                        onDateSelected(cellCal)
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (isValidDay) {
-                                    val cellCal = Calendar.getInstance().apply {
-                                        time = currentMonthCal.time
-                                        set(Calendar.DAY_OF_MONTH, dayNumber)
-                                    }
-                                    val dateStr = DateTimeUtils.formatDbDate(cellCal)
-                                    val isToday = dateStr == todayStr
-                                    val isSelected = dateStr == selectedStr
-                                    val hasTask = taskDates.contains(dateStr)
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                when {
-                                                    isSelected -> MaterialTheme.colorScheme.primary
-                                                    else -> Color.Transparent
-                                                }
-                                            )
-                                            .then(
-                                                if (isToday && !isSelected) {
-                                                    Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                                } else Modifier
-                                            )
-                                            .clickable {
-                                                onDateSelected(cellCal)
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                text = dayNumber.toString(),
-                                                fontSize = AppFontSizes.medium,
-                                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
-                                                color = when {
-                                                    isSelected -> MaterialTheme.colorScheme.onPrimary
-                                                    isToday -> MaterialTheme.colorScheme.primary
-                                                    else -> MaterialTheme.colorScheme.onSurface
-                                                }
-                                            )
-                                            if (hasTask) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(4.dp)
-                                                        .clip(CircleShape)
-                                                        .background(
-                                                            if (isSelected) MaterialTheme.colorScheme.onPrimary
-                                                            else MaterialTheme.colorScheme.primary
-                                                        )
-                                                )
-                                            }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = dayNumber.toString(),
+                                        fontSize = AppFontSizes.medium,
+                                        fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium,
+                                        color = when {
+                                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                                            isToday -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.onSurface
                                         }
+                                    )
+                                    if (hasTask) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                                    else MaterialTheme.colorScheme.primary
+                                                )
+                                        )
                                     }
                                 }
                             }
-                            currentSlot++
                         }
                     }
+                    currentSlot++
                 }
             }
         }
@@ -263,7 +300,7 @@ fun InlineCalendarViewPreview() {
         InlineCalendarView(
             selectedDate = Calendar.getInstance(),
             onDateSelected = {},
-            taskDates = setOf(DateTimeUtils.formatDbDate(Calendar.getInstance())),
+            taskDates = setOf("2026-08-24", "2026-08-18", "2026-08-20"),
             colorSchemeType = "minimal"
         )
     }

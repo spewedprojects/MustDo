@@ -30,6 +30,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -93,12 +95,43 @@ class AlarmActivity : ComponentActivity() {
         val sharedPrefs = getSharedPreferences("soft_todo_prefs", Context.MODE_PRIVATE)
         val themeMode = sharedPrefs.getString("theme", "auto") ?: "auto"
         val colorSchemeType = sharedPrefs.getString("color_scheme", "minimal") ?: "minimal"
+        val colorfulHueShift = sharedPrefs.getFloat("colorful_hue_shift", 0f)
+        val colorfulSatScale = sharedPrefs.getFloat("colorful_sat_scale", 1f)
 
         enableEdgeToEdge()
         setContent {
+            val isDark = when (themeMode) {
+                "light" -> false
+                "dark"  -> true
+                else    -> isSystemInDarkTheme()
+            }
+
+            LaunchedEffect(isDark) {
+                enableEdgeToEdge(
+                    statusBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    },
+                    navigationBarStyle = if (isDark) {
+                        SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    } else {
+                        SystemBarStyle.light(
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    }
+                )
+            }
+
             SoftTodoTheme(
                 themeMode = themeMode,
-                colorSchemeType = colorSchemeType
+                colorSchemeType = colorSchemeType,
+                colorfulHueShift = colorfulHueShift,
+                colorfulSatScale = colorfulSatScale
             ) {
                 LaunchedEffect(AlarmState.activeTasks.size) {
                     if (AlarmState.activeTasks.isEmpty()) {

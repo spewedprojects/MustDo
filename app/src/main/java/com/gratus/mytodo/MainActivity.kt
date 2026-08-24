@@ -68,7 +68,6 @@ import com.gratus.mytodo.ui.SortOption
 import com.gratus.mytodo.ui.components.FaintBackground
 import com.gratus.mytodo.ui.screens.HistoryScreen
 import com.gratus.mytodo.ui.screens.HomeScreen
-import com.gratus.mytodo.ui.screens.IssueTrackerScreen
 import com.gratus.mytodo.ui.screens.SettingsScreen
 import com.gratus.mytodo.ui.screens.StatsScreen
 import com.gratus.mytodo.ui.theme.AppFontSizes
@@ -245,7 +244,6 @@ fun MainLayout(
                 )
                 Screen.STATS    -> StatsScreen(viewModel, colorSchemeType)
                 Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
-                Screen.ISSUE_TRACKER -> IssueTrackerScreen(onOpenDrawer, colorSchemeType)
             }
         }
     )

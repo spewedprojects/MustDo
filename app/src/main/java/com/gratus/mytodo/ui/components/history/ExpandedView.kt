@@ -1,3 +1,21 @@
+/*
+ * MustDO
+ * Copyright (C) 2026 spewedprojects <rkharat98@live.com>
+ *
+ * This file is part of MustDo Application.
+ *
+ * MustDo is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3 of the License.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * See the LICENSE file for details.
+ */
+
 package com.gratus.mytodo.ui.components.history
 
 import androidx.compose.foundation.BorderStroke
@@ -343,6 +361,13 @@ fun ExpandedTaskRow(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
+                    } else {
+                        Text(
+                            text = task.title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = AppFontSizes.large,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
                 
@@ -350,7 +375,7 @@ fun ExpandedTaskRow(
                     getMinimalPriorityColors(task.priority, isCompleted, isDark)
                 } else {
                     val containerCol = getPriorityBoxColor(task.priority, isCompleted)
-                    val textCol = if (task.priority == 4 || isCompleted) Color.DarkGray else Color.White
+                    val textCol = if (task.priority in 3..4 || isCompleted) Color.DarkGray else Color.White
                     PriorityThemeBadgeColors(containerCol, textCol, Color.Transparent)
                 }
                 
@@ -490,7 +515,6 @@ private val previewTasks = listOf(
         priority = 2,
         dateAdded = "2026-08-15",
         isCompleted = true,
-        category = "Work"
     ),
     Task(
         id = 3,
