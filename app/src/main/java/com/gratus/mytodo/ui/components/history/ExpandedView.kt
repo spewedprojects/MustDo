@@ -126,11 +126,11 @@ fun ExpandedView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val activeStickyForDay = remember(stickyTasks, dateObj) {
-                            stickyTasks.filter { task ->
-                                val stickyDate = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
-                                !stickyDate.after(dateObj)
-                            }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        val dayStickyTasks = remember(groupTasks) {
+                            groupTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+                        }
+                        val dayRegularTasks = remember(groupTasks) {
+                            groupTasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
                         }
 
                         Row(
@@ -144,7 +144,7 @@ fun ExpandedView(
                                 color = MaterialTheme.colorScheme.primary
                             )
 
-                            if (activeStickyForDay.isNotEmpty()) {
+                            if (dayStickyTasks.isNotEmpty()) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -160,7 +160,7 @@ fun ExpandedView(
                                         modifier = Modifier.size(10.dp)
                                     )
                                     Text(
-                                        text = "${activeStickyForDay.size} Sticky",
+                                        text = "${dayStickyTasks.size} Sticky",
                                         fontSize = AppFontSizes.extraSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -171,8 +171,8 @@ fun ExpandedView(
                         
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
                         
-                        if (activeStickyForDay.isNotEmpty()) {
-                            activeStickyForDay.forEach { stickyTask ->
+                        if (dayStickyTasks.isNotEmpty()) {
+                            dayStickyTasks.forEach { stickyTask ->
                                 ExpandedTaskRow(
                                     task = stickyTask,
                                     targetDate = cardCal,
@@ -184,8 +184,8 @@ fun ExpandedView(
                         }
                         
                         if (isDoubleColumn) {
-                            val col1Tasks = groupTasks.filterIndexed { index, _ -> index % 2 == 0 }
-                            val col2Tasks = groupTasks.filterIndexed { index, _ -> index % 2 == 1 }
+                            val col1Tasks = dayRegularTasks.filterIndexed { index, _ -> index % 2 == 0 }
+                            val col2Tasks = dayRegularTasks.filterIndexed { index, _ -> index % 2 == 1 }
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -223,7 +223,7 @@ fun ExpandedView(
                                 }
                             }
                         } else {
-                            groupTasks.forEach { task ->
+                            dayRegularTasks.forEach { task ->
                                 ExpandedTaskRow(
                                     task = task,
                                     targetDate = cardCal,

@@ -133,5 +133,36 @@ object DateTimeUtils {
         val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
         return isSameDay(calendar, tomorrow)
     }
+
+    /**
+     * Expands a date range (start and optional end) into a list of formatted DB date strings.
+     * Uses UTC for the input millis (standard for Material 3 DatePickers) and 
+     * local time for the formatted output.
+     */
+    fun expandDateRange(startMillis: Long, endMillis: Long?): List<String> {
+        val startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = startMillis }
+        val dates = mutableListOf<String>()
+
+        if (endMillis == null || endMillis == startMillis) {
+            val localCal = Calendar.getInstance().apply {
+                set(startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            dates.add(formatDbDate(localCal))
+            return dates
+        }
+
+        val endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = endMillis }
+        val cursor = startCal.clone() as Calendar
+        while (!cursor.after(endCal)) {
+            val localCal = Calendar.getInstance().apply {
+                set(cursor.get(Calendar.YEAR), cursor.get(Calendar.MONTH), cursor.get(Calendar.DAY_OF_MONTH), 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            dates.add(formatDbDate(localCal))
+            cursor.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        return dates
+    }
 }
 

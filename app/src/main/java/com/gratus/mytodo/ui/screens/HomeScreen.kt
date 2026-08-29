@@ -123,6 +123,7 @@ fun HomeScreen(
     val isNotificationGranted by viewModel.isNotificationPermissionGranted.collectAsState()
     val isFullScreenGranted by viewModel.isFullScreenPermissionGranted.collectAsState()
     val copiedTask by viewModel.copiedTask.collectAsState()
+    val categories by viewModel.categories.collectAsState()
     val customCategories by viewModel.customCategories.collectAsState()
 
     val isStickyEnabled by viewModel.isStickyEnabled.collectAsState()
@@ -139,6 +140,7 @@ fun HomeScreen(
         isNotificationPermissionGranted = isNotificationGranted,
         isFullScreenPermissionGranted = isFullScreenGranted,
         copiedTask = copiedTask,
+        categories = categories,
         customCategories = customCategories,
         sortOption = sortOption,
         isStickyEnabled = isStickyEnabled,
@@ -183,6 +185,7 @@ fun HomeScreenContent(
     isNotificationPermissionGranted: Boolean,
     isFullScreenPermissionGranted: Boolean = true,
     copiedTask: CopiedTask?,
+    categories: List<String> = emptyList(),
     customCategories: List<String>,
     sortOption: SortOption = SortOption.PRIORITY,
     isStickyEnabled: Boolean = true,
@@ -264,6 +267,9 @@ fun HomeScreenContent(
             }
 
             AnimatedVisibility(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 visible = isInlineCalendarExpanded,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
@@ -331,6 +337,7 @@ fun HomeScreenContent(
             preselectedCategory = preselectedCategory.value,
             copiedTask = copiedTask,
             onCopy = onCopy,
+            categories = categories,
             customCategories = customCategories,
             onAddCategory = onAddCustomCategory,
             onDeleteCategory = onDeleteCustomCategory
@@ -360,6 +367,7 @@ fun HomeScreenContent(
             },
             copiedTask = copiedTask,
             onCopy = onCopy,
+            categories = categories,
             customCategories = customCategories,
             onAddCategory = onAddCustomCategory,
             onDeleteCategory = onDeleteCustomCategory

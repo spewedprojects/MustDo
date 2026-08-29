@@ -105,8 +105,8 @@ fun MonthView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val activeStickyInMonth = remember(stickyTasks, monthStr) {
-                            stickyTasks.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        val activeStickyInMonth = remember(monthTasks) {
+                            monthTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
                         }
                         val monthCal = remember(monthTasks) {
                             val firstTask = monthTasks.firstOrNull()

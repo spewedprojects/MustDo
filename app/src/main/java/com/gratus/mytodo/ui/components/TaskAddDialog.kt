@@ -98,6 +98,7 @@ fun TaskAddDialog(
     preselectedCategory: String? = null,
     copiedTask: CopiedTask? = null,
     onCopy: ((CopiedTask) -> Unit)? = null,
+    categories: List<String> = emptyList(),
     customCategories: List<String> = emptyList(),
     onAddCategory: (String) -> Unit = {},
     onDeleteCategory: (String) -> Unit = {}
@@ -118,6 +119,7 @@ fun TaskAddDialog(
             preselectedCategory = preselectedCategory,
             copiedTask = copiedTask,
             onCopy = onCopy,
+            categories = categories,
             customCategories = customCategories,
             onAddCategory = onAddCategory,
             onDeleteCategory = onDeleteCategory
@@ -139,6 +141,7 @@ fun TaskAddDialogContent(
     preselectedCategory: String? = null,
     copiedTask: CopiedTask? = null,
     onCopy: ((CopiedTask) -> Unit)? = null,
+    categories: List<String> = emptyList(),
     customCategories: List<String> = emptyList(),
     onAddCategory: (String) -> Unit = {},
     onDeleteCategory: (String) -> Unit = {}
@@ -235,6 +238,7 @@ fun TaskAddDialogContent(
                     TaskPriorityCategoryRow(
                         priority = priority,
                         selectedCategory = selectedCategory,
+                        categories = categories,
                         customCategories = customCategories,
                         onPriorityChange = { priority = it },
                         onCategoryChange = { selectedCategory = it },

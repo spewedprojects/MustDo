@@ -63,12 +63,9 @@ fun FeaturePreferencesCard(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = when (colorSchemeType) {
-            "simple" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-            "system" -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-            )
-            else -> BorderStroke(0.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.0f)
-            )
+            "simple" -> BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+            "system" -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+            else -> null
         }
     ) {
         Column(
@@ -87,7 +84,8 @@ fun FeaturePreferencesCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
-            ) {
+            )
+            {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -107,7 +105,7 @@ fun FeaturePreferencesCard(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Enable sticky tasks. Disabling hides all sticky features without altering database records.",
+                            text = "Enable sticky tasks feature. Disabling hides all sticky features without altering database records.",
                             fontSize = AppFontSizes.small,
                             lineHeight = 18.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)

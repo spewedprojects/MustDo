@@ -26,27 +26,32 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePickerColors
+import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DateRangePickerDefaults
+import androidx.compose.material3.DateRangePickerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import com.gratus.mytodo.ui.theme.dialogContainerColor
 import com.gratus.mytodo.ui.utils.DateTimeUtils
-import java.util.Calendar
-import java.util.TimeZone
+import java.util.Locale
 
 /**
  * Custom Category creation AlertDialog.
@@ -113,47 +118,41 @@ fun CustomDateRangePickerDialog(
     onDismiss: () -> Unit,
     onConfirmDates: (List<String>) -> Unit
 ) {
-    val dateRangePickerState = rememberDateRangePickerState()
+    val configuration = LocalConfiguration.current
+    val defaultLocale = configuration.locales[0]
+
+    // Force Monday as the first day of the week
+    val customLocale = remember(defaultLocale) {
+        Locale.forLanguageTag(defaultLocale.toLanguageTag() + "-u-fw-mon")
+    }
+
+    val dateRangePickerState = remember(customLocale) {
+        DateRangePickerState(
+            locale = customLocale
+        )
+    }
+
+    val confirmEnabled by remember {
+        derivedStateOf { dateRangePickerState.selectedStartDateMillis != null }
+    }
 
     DatePickerDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            shape = RoundedCornerShape(20.dp)
+        ),
         confirmButton = {
             TextButton(
+                enabled = confirmEnabled,
                 onClick = {
-                    val startMillis = dateRangePickerState.selectedStartDateMillis
-                    val endMillis = dateRangePickerState.selectedEndDateMillis
-                    if (startMillis != null && endMillis != null) {
-                        val startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = startMillis }
-                        val endCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = endMillis }
-
-                        val dates = mutableListOf<String>()
-                        val cursor = startCal.clone() as Calendar
-                        while (!cursor.after(endCal)) {
-                            val localCal = Calendar.getInstance().apply {
-                                set(Calendar.YEAR, cursor.get(Calendar.YEAR))
-                                set(Calendar.MONTH, cursor.get(Calendar.MONTH))
-                                set(Calendar.DAY_OF_MONTH, cursor.get(Calendar.DAY_OF_MONTH))
-                                set(Calendar.HOUR_OF_DAY, 0)
-                                set(Calendar.MINUTE, 0)
-                                set(Calendar.SECOND, 0)
-                                set(Calendar.MILLISECOND, 0)
-                            }
-                            dates.add(DateTimeUtils.formatDbDate(localCal))
-                            cursor.add(Calendar.DAY_OF_YEAR, 1)
-                        }
+                    dateRangePickerState.selectedStartDateMillis?.let { start ->
+                        val dates = DateTimeUtils.expandDateRange(
+                            start,
+                            dateRangePickerState.selectedEndDateMillis
+                        )
                         onConfirmDates(dates)
-                    } else if (startMillis != null) {
-                        val startCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = startMillis }
-                        val localCal = Calendar.getInstance().apply {
-                            set(Calendar.YEAR, startCal.get(Calendar.YEAR))
-                            set(Calendar.MONTH, startCal.get(Calendar.MONTH))
-                            set(Calendar.DAY_OF_MONTH, startCal.get(Calendar.DAY_OF_MONTH))
-                            set(Calendar.HOUR_OF_DAY, 0)
-                            set(Calendar.MINUTE, 0)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }
-                        onConfirmDates(listOf(DateTimeUtils.formatDbDate(localCal)))
                     }
                     onDismiss()
                 }
@@ -166,19 +165,36 @@ fun CustomDateRangePickerDialog(
                 Text("Cancel")
             }
         },
-        shape = RoundedCornerShape(28.dp),
-        tonalElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-        ) {
-            DateRangePicker(
-                state = dateRangePickerState,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 0.dp,
+        colors = DatePickerDefaults.colors(containerColor = MaterialTheme.colorScheme.dialogContainerColor)
+    )
+    {
+        DateRangePicker(
+            state = dateRangePickerState,
+            title = {
+                Text(
+                    text = "Select Date Range",
+                    modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Normal
+                )
+            },
+            headline = {
+                DateRangePickerDefaults.DateRangePickerHeadline(
+                    selectedStartDateMillis = dateRangePickerState.selectedStartDateMillis,
+                    selectedEndDateMillis = dateRangePickerState.selectedEndDateMillis,
+                    displayMode = dateRangePickerState.displayMode,
+                    dateFormatter = DatePickerDefaults.dateFormatter(),
+                    modifier = Modifier.padding(start = 24.dp, bottom = 12.dp)
+                )
+            },
+            showModeToggle = false,
+            modifier = Modifier.weight(1f),
+            colors = DatePickerDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.dialogContainerColor,
+                weekdayContentColor = MaterialTheme.colorScheme.onSurface)
+        )
     }
 }
 

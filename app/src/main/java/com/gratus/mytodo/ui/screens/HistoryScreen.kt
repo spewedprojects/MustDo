@@ -247,14 +247,13 @@ fun HistoryScreenContent(
                                 Box(
                                     modifier = Modifier
                                         .widthIn(min = 300.dp, max = 360.dp)
-                                        .shadow(3.dp, RoundedCornerShape(24.dp))
                                         .background(MaterialTheme.colorScheme.dialogContainerColor, RoundedCornerShape(24.dp))
                                         .border(
                                             1.dp,
                                             MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                            RoundedCornerShape(24.dp)
+                                            RoundedCornerShape(28.dp)
                                         )
-                                        .padding(vertical = 4.dp)
+                                        .padding(8.dp)
                                 ) {
                                     InlineCalendarView(
                                         selectedDate = currentSelectedCal,
@@ -311,16 +310,17 @@ fun HistoryScreenContent(
             }
         }
 
-        val stickyTasks = remember(tasks, isStickyEnabled) {
-            if (!isStickyEnabled) emptyList()
-            else tasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
+        val visibleTasks = remember(tasks, isStickyEnabled) {
+            if (!isStickyEnabled) tasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
+            else tasks
         }
-        val regularTasks = remember(tasks) {
-            tasks.filter { it.category?.equals("Sticky", ignoreCase = true) != true }
+        val stickyTasks = remember(visibleTasks, isStickyEnabled) {
+            if (!isStickyEnabled) emptyList()
+            else visibleTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }
         }
 
         // Timeline Content List with AnimatedContent to handle cross-fades
-        if (regularTasks.isEmpty() && stickyTasks.isEmpty()) {
+        if (visibleTasks.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -347,21 +347,21 @@ fun HistoryScreenContent(
             ) { targetZoom ->
                 when (targetZoom) {
                     0 -> YearView(
-                        tasks = regularTasks,
+                        tasks = visibleTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onQueryChange = onQueryChange,
                         onZoomLevelSet = onZoomLevelSet
                     )
                     1 -> MonthView(
-                        tasks = regularTasks,
+                        tasks = visibleTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onZoomLevelSet = onZoomLevelSet,
                         onNavigateToHomeDate = onNavigateToHomeDate
                     )
                     2 -> WeekView(
-                        tasks = regularTasks,
+                        tasks = visibleTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onQueryChange = onQueryChange,
@@ -369,23 +369,23 @@ fun HistoryScreenContent(
                         onNavigateToHomeDate = onNavigateToHomeDate
                     )
                     3 -> ExpandedView(
-                        tasks = regularTasks,
+                        tasks = visibleTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onNavigateToHomeDate = onNavigateToHomeDate,
                         isDoubleColumn = isDoubleColumnInDayView
                     )
                     else -> ExpandedView(
-                        tasks = regularTasks,
+                        tasks = visibleTasks,
                         stickyTasks = stickyTasks,
                         colorSchemeType = colorSchemeType,
                         onNavigateToHomeDate = onNavigateToHomeDate,
                         isDoubleColumn = isDoubleColumnInDayView
                     )
                 }
+            }
         }
     }
-}
 
     // Horizontal Zoom floating action buttons placed at bottom right corner
     Row(

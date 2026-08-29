@@ -69,14 +69,15 @@ import com.gratus.mytodo.ui.theme.dialogContainerColor
  */
 @Composable
 fun TaskPriorityCategoryRow(
+    modifier: Modifier = Modifier,
     priority: Int,
     selectedCategory: String?,
+    categories: List<String> = emptyList(),
     customCategories: List<String>,
     onPriorityChange: (Int) -> Unit,
     onCategoryChange: (String?) -> Unit,
     onShowAddCategoryDialog: () -> Unit,
-    onDeleteCategory: (String) -> Unit,
-    modifier: Modifier = Modifier
+    onDeleteCategory: (String) -> Unit
 ) {
     var showPriorityDropdown by remember { mutableStateOf(false) }
     var showCategoryDropdown by remember { mutableStateOf(false) }
@@ -290,8 +291,8 @@ fun TaskPriorityCategoryRow(
                         showCategoryDropdown = false
                     }
                 )
-                val defaultCats = listOf("Sticky", "Personal", "Work", "Errands", "Health", "Learning")
-                val allCategories = (defaultCats + customCategories).distinct()
+                val defaultFallback = listOf("Sticky", "Personal", "Work", "Errands", "Health", "Learning")
+                val allCategories = if (categories.isNotEmpty()) categories else (defaultFallback + customCategories).distinct()
                 allCategories.forEach { cat ->
                     DropdownMenuItem(
                         text = { Text(cat) },

@@ -705,9 +705,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Update task details (title, description, priority, date, alarm/reminder, subtasks, category).
-     */
-    /**
      * Update task details (title, description, priority, date, alarm/reminder, subtasks, category, replication).
      * Handles transitions between Sticky and Normal categories, and virtual sticky tasks (id == 0).
      */

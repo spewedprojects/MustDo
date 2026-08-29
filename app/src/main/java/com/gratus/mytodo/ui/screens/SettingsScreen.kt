@@ -47,14 +47,14 @@ import com.gratus.mytodo.ui.components.settings.BackupsRestorationsCard
 import com.gratus.mytodo.ui.components.settings.FeaturePreferencesCard
 import com.gratus.mytodo.ui.components.settings.ReminderSettingsCard
 import com.gratus.mytodo.ui.theme.SoftTodoTheme
+import java.io.OutputStream
 
 /**
  * SettingsScreen includes theme configurations, color scheme selectors, and backups.
  */
 @Composable
 fun SettingsScreen(
-    viewModel: MainViewModel,
-    colorSchemeType: String
+    viewModel: MainViewModel
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -101,6 +101,7 @@ fun SettingsScreen(
         isFullScreenPermissionGranted = isFullScreenGranted,
         colorfulHueShift = colorfulHueShift,
         colorfulSatScale = colorfulSatScale,
+        colorSchemeType = activeScheme,
         isStickyEnabled = isStickyEnabled,
         onThemeChange = { viewModel.setTheme(it) },
         onSchemeChange = { viewModel.setColorScheme(it) },
@@ -170,11 +171,12 @@ fun SettingsScreenContent(
     onHueShiftChange: (Float) -> Unit = {},
     onSatScaleChange: (Float) -> Unit = {},
     onStickyEnabledChange: (Boolean) -> Unit = {},
-    onExportJson: (java.io.OutputStream) -> Boolean = { false },
-    onExportDb: (java.io.OutputStream) -> Boolean = { false },
+    onExportJson: (OutputStream) -> Boolean = { false },
+    onExportDb: (OutputStream) -> Boolean = { false },
     onImportBackup: (Uri, (Boolean, Boolean) -> Unit) -> Unit = { _, _ -> },
     ringtoneUri: String?,
-    onRingtoneClick: () -> Unit
+    onRingtoneClick: () -> Unit,
+    colorSchemeType: String
 ) {
     val context = LocalContext.current
 
@@ -211,7 +213,7 @@ fun SettingsScreenContent(
     ) {
         // Feature Preferences Container (Sticky Tasks Toggle)
         FeaturePreferencesCard(
-            colorSchemeType = String(),
+            colorSchemeType = activeScheme,
             isStickyEnabled = isStickyEnabled,
             onStickyEnabledChange = onStickyEnabledChange
         )
@@ -221,7 +223,7 @@ fun SettingsScreenContent(
             activeTheme = activeTheme,
             customizerExpanded = false,
             activeScheme = activeScheme,
-            colorSchemeType = String(),
+            colorSchemeType = colorSchemeType,
             colorfulHueShift = colorfulHueShift,
             colorfulSatScale = colorfulSatScale,
             onThemeChange = onThemeChange,
@@ -233,7 +235,7 @@ fun SettingsScreenContent(
         // Reminder Settings Container
         ReminderSettingsCard(
             isAlarmPermissionGranted = isAlarmPermissionGranted,
-            colorSchemeType = String(),
+            colorSchemeType = activeScheme,
             isNotificationPermissionGranted = isNotificationPermissionGranted,
             isFullScreenPermissionGranted = isFullScreenPermissionGranted,
             activeInterval = activeInterval,
@@ -246,7 +248,7 @@ fun SettingsScreenContent(
         // Backups & Exports Container
         BackupsRestorationsCard(
             context = context,
-            colorSchemeType = String(),
+            colorSchemeType = colorSchemeType,
             importLauncher = importLauncher,
             onExportJson = onExportJson,
             onExportDb = onExportDb
@@ -264,14 +266,11 @@ fun SettingsScreenPreview() {
             activeInterval = 10,
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
-            onThemeChange = {},
-            onSchemeChange = {},
-            onIntervalChange = {},
             onExportJson = { true },
             onExportDb = { true },
-            onImportBackup = { _, _ -> },
             ringtoneUri = null,
-            onRingtoneClick = {}
+            onRingtoneClick = {},
+            colorSchemeType = "simple"
         )
     }
 }
@@ -286,14 +285,11 @@ fun SettingsScreenNavigableDarkPreview() {
             activeInterval = 10,
             isAlarmPermissionGranted = true,
             isNotificationPermissionGranted = true,
-            onThemeChange = {},
-            onSchemeChange = {},
-            onIntervalChange = {},
             onExportJson = { true },
             onExportDb = { true },
-            onImportBackup = { _, _ -> },
             ringtoneUri = null,
-            onRingtoneClick = {}
+            onRingtoneClick = {},
+            colorSchemeType = "minimal"
         )
     }
 }

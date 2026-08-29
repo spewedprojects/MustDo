@@ -153,9 +153,9 @@ fun TaskReminderSection(
                             .border(
                                 width = 1.dp,
                                 color = MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(20.dp)
+                                shape = RoundedCornerShape(12.dp)
                             )
-                            .clip(RoundedCornerShape(20.dp)),
+                            .clip(RoundedCornerShape(12.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Edit Segment

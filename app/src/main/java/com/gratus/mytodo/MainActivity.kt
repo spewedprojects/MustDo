@@ -243,7 +243,7 @@ fun MainLayout(
                     }
                 )
                 Screen.STATS    -> StatsScreen(viewModel, colorSchemeType)
-                Screen.SETTINGS -> SettingsScreen(viewModel, colorSchemeType)
+                Screen.SETTINGS -> SettingsScreen(viewModel)
             }
         }
     )

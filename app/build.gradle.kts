@@ -13,9 +13,9 @@ android {
     defaultConfig {
         applicationId = "com.gratus.mytodo"
         minSdk = 27
-        targetSdk = 36
-        versionCode = 32
-        versionName = "7.2.0"
+        targetSdk = 37
+        versionCode = 33
+        versionName = "7.3.0"
 
         // Pass versionName to the app as a resource
         resValue(
@@ -145,6 +145,4 @@ dependencies {
     "ksp"(libs.androidx.room.compiler)
     "ksp"(libs.moshi.kotlin.codegen)
 
-    // Rounded checkbox implementation
-    //implementation("com.github.kosher9:Compose-Round-CheckBox:Tag")
 }

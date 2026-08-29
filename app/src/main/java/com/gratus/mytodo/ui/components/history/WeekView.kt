@@ -123,15 +123,8 @@ fun WeekView(
                         modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val activeStickyInWeek = remember(stickyTasks, weekDate) {
-                            val weekEnd = Calendar.getInstance().apply {
-                                time = weekDate
-                                add(Calendar.DAY_OF_MONTH, 6)
-                            }.time
-                            stickyTasks.filter { task ->
-                                val stickyDate = DateTimeUtils.parseDbDate(task.dateAdded) ?: Date()
-                                !stickyDate.after(weekEnd)
-                            }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
+                        val activeStickyInWeek = remember(weekTasks) {
+                            weekTasks.filter { it.category?.equals("Sticky", ignoreCase = true) == true }.distinctBy { it.title.trim().lowercase(Locale.ROOT) }
                         }
 
                         Row(
